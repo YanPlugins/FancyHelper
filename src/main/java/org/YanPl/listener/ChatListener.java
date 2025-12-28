@@ -17,13 +17,15 @@ public class ChatListener implements Listener {
         this.plugin = plugin;
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onPlayerChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
         String message = event.getMessage();
 
         // 检查玩家是否处于 CLI 模式或正在等待协议
         if (plugin.getCliManager().handleChat(player, message)) {
+            // 尝试通过清除收件人来减少 Secure Chat 警告
+            event.getRecipients().clear();
             event.setCancelled(true);
         }
     }

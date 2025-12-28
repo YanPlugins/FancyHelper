@@ -109,7 +109,12 @@ public class CloudFlareAI {
         }
 
         bodyJson.add("messages", messagesArray);
-        String jsonPayload = gson.toJson(bodyJson);
+        
+        // 包装在 input 字段中，解决部分模型（如 GPT-OSS）报 400 错误的问题
+        JsonObject payloadJson = new JsonObject();
+        payloadJson.add("input", bodyJson);
+        
+        String jsonPayload = gson.toJson(payloadJson);
         plugin.getLogger().info("[AI Request] Body: " + jsonPayload);
 
         RequestBody body = RequestBody.create(

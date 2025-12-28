@@ -209,6 +209,8 @@ public class CLIManager {
         player.sendMessage(ChatColor.GRAY + "◇ " + message);
         player.sendMessage(ChatColor.GRAY + "◆ Thought...");
 
+        plugin.getLogger().info("[CLI] Session " + player.getName() + " - History Size: " + session.getHistory().size() + ", Est. Tokens: " + session.getEstimatedTokens());
+
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
                 String response = ai.chat(session, promptManager.getBaseSystemPrompt());
@@ -226,6 +228,8 @@ public class CLIManager {
         UUID uuid = player.getUniqueId();
         DialogueSession session = sessions.get(uuid);
         if (session == null) return;
+
+        plugin.getLogger().info("[CLI] AI Response received for " + player.getName() + " (Length: " + response.length() + ")");
 
         // 解析思考内容（如果有的话，通常 AI 会输出 <thought>...</thought> 或类似内容）
         // 根据 Todo.md，如果 AI 进行了思考，删除思考内容。
