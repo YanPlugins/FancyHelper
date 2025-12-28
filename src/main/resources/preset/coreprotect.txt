@@ -1,7 +1,10 @@
 CoreProtect (CP) 常用命令：
 /co inspect (或 /co i) - 开启/关闭查询模式
-/co rollback u:<user> t:<time> r:<radius> - 回档
-/co restore u:<user> t:<time> r:<radius> - 恢复
-/co lookup u:<user> t:<time> - 查询玩家行为
-时间格式：1h (1小时), 1d (1天), 1w (1周)
-半径格式：r:10 (10格内), r:#global (全局)
+/co rollback u:<user> t:<time> r:<radius> - 回档（撤销行为）
+/co restore u:<user> t:<time> r:<radius> - 恢复（重做行为）
+/co lookup u:<user> t:<time> r:<radius> a:<action> - 详细查询
+/co purge t:<time> - 清除旧的日志数据（管理员）
+/co reload - 重新加载配置
+时间格式示例：1h (1小时), 1d (1天), 1w (1周), 10m (10分钟)
+半径格式示例：r:10 (10格半径), r:#global (全局), r:#world (当前世界)
+动作类型(a:)：+block (放置), -block (破坏), +container (放入), -container (取出), kill (击杀)

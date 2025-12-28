@@ -1,0 +1,15 @@
+WorldEdit (创世神) 常用命令：
+//wand - 获取选择工具（默认木斧）
+//pos1 / //pos2 - 设置选择区域的两个点
+//set <block> - 将选择区域填充为某种方块
+//replace <from_block> <to_block> - 替换区域内的特定方块
+//copy - 复制当前选择区域（相对于你的位置）
+//paste - 粘贴已复制的区域（相对于你的位置）
+//undo - 撤销上一步操作
+//redo - 重做被撤销的操作
+//rotate <degrees> - 旋转已复制的内容
+//schem load/save <name> - 加载或保存结构文件
+//br sphere <block> [radius] - 笔刷工具：生成球体
+//smooth - 平滑选择区域的地形
+//stack <count> [direction] - 沿某个方向堆叠选区
+注意：WorldEdit 大多数命令以双斜杠 // 开头，范围操作前请务必确认选区大小。

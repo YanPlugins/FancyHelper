@@ -245,7 +245,8 @@ public class CLIManager {
         isGenerating.put(uuid, true);
 
         player.sendMessage(ChatColor.GRAY + "◇ " + message);
-        player.sendMessage(ChatColor.GRAY + "◆ Thought...");
+        // 不再主动发送 Thought...，避免干扰用户
+        // player.sendMessage(ChatColor.GRAY + "◆ Thought...");
 
         plugin.getLogger().info("[CLI] Session " + player.getName() + " - History Size: " + session.getHistory().size() + ", Est. Tokens: " + session.getEstimatedTokens());
 
@@ -275,9 +276,13 @@ public class CLIManager {
 
         plugin.getLogger().info("[CLI] AI Response received for " + player.getName() + " (Length: " + response.length() + ")");
 
-        // 解析思考内容（如果有的话，通常 AI 会输出 <thought>...</thought> 或类似内容）
-        // 根据 Todo.md，如果 AI 进行了思考，删除思考内容。
-        String cleanResponse = response.replaceAll("(?s)<thought>.*?</thought>", "").trim();
+        // 解析并移除思考内容
+        // 移除 <thought>...</thought>
+        String cleanResponse = response.replaceAll("(?s)<thought>.*?</thought>", "");
+        // 移除 Markdown 风格的 Thought: 块或类似文本
+        cleanResponse = cleanResponse.replaceAll("(?i)^Thought:.*?\n", "");
+        cleanResponse = cleanResponse.replaceAll("(?i)^思考过程:.*?\n", "");
+        cleanResponse = cleanResponse.trim();
         
         // 增强的工具调用提取逻辑：使用正则表达式匹配末尾的工具调用
         // 匹配模式：最后一个 # 加上已知的工具名
@@ -359,8 +364,10 @@ public class CLIManager {
         // 统一转换为小写进行匹配
         String lowerToolName = toolName.toLowerCase();
         
-        // 展示给玩家时只显示工具名
-        player.sendMessage(ChatColor.GRAY + "〇 " + toolName);
+        // 展示给玩家时只显示工具名（如果不是 search 或 run 这种有自己显示逻辑的工具）
+        if (!lowerToolName.equals("#search") && !lowerToolName.equals("#run")) {
+            player.sendMessage(ChatColor.GRAY + "〇 " + toolName);
+        }
 
         switch (lowerToolName) {
             case "#over":
@@ -576,25 +583,25 @@ public class CLIManager {
 
     private void handleChooseTool(Player player, String optionsStr) {
         String[] options = optionsStr.split(",");
-        TextComponent message = new TextComponent(ChatColor.DARK_RED + "⨂ 【 ");
+        TextComponent message = new TextComponent(ChatColor.GRAY + "⨀ [ ");
         
         for (int i = 0; i < options.length; i++) {
             String opt = options[i].trim();
-            TextComponent optBtn = new TextComponent(ChatColor.YELLOW + opt);
-            optBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, opt));
-            optBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text("选择 " + opt)));
+            TextComponent optBtn = new TextComponent(ChatColor.AQUA + opt);
+            // 设置点击事件，点击后执行 /cli select <opt>
+            optBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli select " + opt));
+            optBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击选择: " + ChatColor.AQUA + opt)));
             
             message.addExtra(optBtn);
             if (i < options.length - 1) {
-                message.addExtra(ChatColor.WHITE + " | ");
+                message.addExtra(ChatColor.GRAY + " | ");
             }
         }
-        message.addExtra(ChatColor.DARK_RED + " 】");
+        message.addExtra(ChatColor.GRAY + " ]");
         
         player.spigot().sendMessage(message);
-        // 等待玩家输入或点击，这里通过 handleChat 拦截
-        // 需要一个状态标记玩家正在进行选择
-        pendingCommands.put(player.getUniqueId(), "CHOOSING"); // 借用 pendingCommands 拦截输入
+        // 标记玩家正在进行选择，以便拦截点击后的 RUN_COMMAND
+        pendingCommands.put(player.getUniqueId(), "CHOOSING"); 
     }
 
     private void handleSearchTool(Player player, String query) {
@@ -607,6 +614,11 @@ public class CLIManager {
                 result = fetchPublicSearchResult(q);
             } else {
                 result = fetchWikiResult(query);
+                // 如果 Wiki 没搜到，自动尝试全网搜索
+                if (result.equals("未找到相关 Wiki 条目。")) {
+                    player.sendMessage(ChatColor.GRAY + "〇 Wiki 无结果，正在尝试全网搜索...");
+                    result = fetchPublicSearchResult(query);
+                }
             }
             
             final String finalResult = result;
@@ -652,35 +664,45 @@ public class CLIManager {
     /**
      * 调用公开搜索接口 (DuckDuckGo Instant Answer)
      */
+    private void handleRelatedTopics(com.google.gson.JsonArray topics, StringBuilder sb, int[] count) {
+        for (int i = 0; i < topics.size() && count[0] < 3; i++) {
+            com.google.gson.JsonObject item = topics.get(i).getAsJsonObject();
+            if (item.has("Topics")) {
+                // 处理嵌套话题
+                handleRelatedTopics(item.getAsJsonArray("Topics"), sb, count);
+            } else if (item.has("Text")) {
+                sb.append("- ").append(item.get("Text").getAsString()).append("\n");
+                count[0]++;
+            }
+        }
+    }
+
     private String fetchPublicSearchResult(String query) {
         try {
-            // 使用 DuckDuckGo 的公开 API (虽然是 Instant Answer，但对简单查询有效)
+            // 使用 DuckDuckGo 的公开 API
             String url = "https://api.duckduckgo.com/?q=" + 
                          java.net.URLEncoder.encode(query, "UTF-8") + "&format=json&no_html=1&skip_disambig=1";
             
-            okhttp3.Request request = new okhttp3.Request.Builder().url(url).build();
+            okhttp3.Request request = new okhttp3.Request.Builder()
+                .url(url)
+                .header("User-Agent", "MineAgent/1.0") // 添加 User-Agent
+                .build();
+                
              try (okhttp3.Response response = ai.getHttpClient().newCall(request).execute()) {
                  if (response.isSuccessful() && response.body() != null) {
                     com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(response.body().string()).getAsJsonObject();
-                    String abstractText = json.get("AbstractText").getAsString();
+                    String abstractText = json.has("AbstractText") ? json.get("AbstractText").getAsString() : "";
                     
                     if (!abstractText.isEmpty()) {
                         return "全网搜索摘要 (" + query + "): " + abstractText;
                     }
                     
-                    // 如果没有摘要，尝试获取相关话题
-                    com.google.gson.JsonArray relatedTopics = json.getAsJsonArray("RelatedTopics");
-                    if (searchResultsExist(relatedTopics)) {
+                    if (json.has("RelatedTopics")) {
+                        com.google.gson.JsonArray relatedTopics = json.getAsJsonArray("RelatedTopics");
                         StringBuilder sb = new StringBuilder("相关搜索结果：\n");
-                        int count = 0;
-                        for (int i = 0; i < relatedTopics.size() && count < 3; i++) {
-                            com.google.gson.JsonObject topic = relatedTopics.get(i).getAsJsonObject();
-                            if (topic.has("Text")) {
-                                sb.append("- ").append(topic.get("Text").getAsString()).append("\n");
-                                count++;
-                            }
-                        }
-                        return sb.toString();
+                        int[] count = {0};
+                        handleRelatedTopics(relatedTopics, sb, count);
+                        if (count[0] > 0) return sb.toString();
                     }
                 }
             }
