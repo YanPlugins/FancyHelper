@@ -279,29 +279,25 @@ public class CLIManager {
         // 根据 Todo.md，如果 AI 进行了思考，删除思考内容。
         String cleanResponse = response.replaceAll("(?s)<thought>.*?</thought>", "").trim();
         
-        // 分离工具调用：从后往前找最后一个以 # 开头的行
+        // 增强的工具调用提取逻辑：使用正则表达式匹配末尾的工具调用
+        // 匹配模式：最后一个 # 加上已知的工具名
         String content = cleanResponse;
         String toolCall = "";
         
-        String[] lines = cleanResponse.split("\n");
-        StringBuilder contentBuilder = new StringBuilder();
-        boolean toolFound = false;
-
-        for (int i = lines.length - 1; i >= 0; i--) {
-            String line = lines[i].trim();
-            if (!toolFound && line.startsWith("#")) {
-                toolCall = line;
-                toolFound = true;
-            } else {
-                if (contentBuilder.length() > 0) {
-                    contentBuilder.insert(0, "\n");
-                }
-                contentBuilder.insert(0, lines[i]);
-            }
-        }
+        // 定义已知工具列表
+        List<String> knownTools = Arrays.asList("#over", "#exit", "#run", "#get", "#choose", "#search");
         
-        if (toolFound) {
-            content = contentBuilder.toString().trim();
+        // 从后往前寻找最后一个工具调用
+        int lastHashIndex = cleanResponse.lastIndexOf("#");
+        if (lastHashIndex != -1) {
+            String potentialToolPart = cleanResponse.substring(lastHashIndex).trim();
+            for (String tool : knownTools) {
+                if (potentialToolPart.toLowerCase().startsWith(tool)) {
+                    toolCall = potentialToolPart;
+                    content = cleanResponse.substring(0, lastHashIndex).trim();
+                    break;
+                }
+            }
         }
 
         // 展示 Agent 内容
