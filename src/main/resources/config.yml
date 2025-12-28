@@ -1,3 +1,6 @@
+# MineAgent Configuration
+version: v1.0.1
+
 # CloudFlare Workers AI Configuration
 cloudflare:
   cf_key: maF_cBg4UXnWgTaE8t8tdAq-iGZ5osv6CHxm2nH0
