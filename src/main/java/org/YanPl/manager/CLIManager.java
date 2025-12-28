@@ -607,6 +607,11 @@ public class CLIManager {
                 result = fetchPublicSearchResult(q);
             } else {
                 result = fetchWikiResult(query);
+                // 如果 Wiki 没搜到，自动尝试全网搜索
+                if (result.equals("未找到相关 Wiki 条目。")) {
+                    player.sendMessage(ChatColor.GRAY + "〇 Wiki 无结果，正在尝试全网搜索...");
+                    result = fetchPublicSearchResult(query);
+                }
             }
             
             final String finalResult = result;
