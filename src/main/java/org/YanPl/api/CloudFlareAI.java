@@ -107,9 +107,15 @@ public class CloudFlareAI {
             messagesArray.add(m);
         }
 
-        // 构建请求体
+        // 构建请求体 - 适配某些特定模型的 input 对象包装格式
         JsonObject bodyJson = new JsonObject();
-        bodyJson.add("input", messagesArray);
+        
+        // 如果是特定模型，可能需要将 messages 包装在 input 字段内
+        // 根据报错信息：required properties at '/' are 'input'
+        JsonObject inputObj = new JsonObject();
+        inputObj.add("messages", messagesArray);
+        bodyJson.add("input", inputObj);
+        
         String bodyString = gson.toJson(bodyJson);
 
         plugin.getLogger().info("[AI Request] URL: " + url);
