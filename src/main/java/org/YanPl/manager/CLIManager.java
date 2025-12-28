@@ -400,12 +400,119 @@ public class CLIManager {
 
     private void executeCommand(Player player, String command) {
         Bukkit.getScheduler().runTask(plugin, () -> {
-            boolean success = Bukkit.dispatchCommand(player, command);
-            String result = success ? "命令执行成功" : "命令执行失败";
-            player.sendMessage(ChatColor.GRAY + "⇒ " + result);
+            StringBuilder output = new StringBuilder();
             
-            // 将结果反馈给 AI
-            feedbackToAI(player, "#run_result: " + result);
+            // 创建一个临时的 CommandSender 来拦截输出
+            // 使用最终变量数组来解决匿名内部类引用问题
+            final org.bukkit.command.CommandSender[] interceptorWrapper = new org.bukkit.command.CommandSender[1];
+            
+            interceptorWrapper[0] = new org.bukkit.command.CommandSender() {
+                @Override
+                public void sendMessage(String message) {
+                    if (message == null) return;
+                    if (output.length() > 0) output.append("\n");
+                    output.append(org.bukkit.ChatColor.stripColor(message));
+                    player.sendMessage(message); // 仍然发送给玩家，保证玩家能看到
+                }
+
+                @Override
+                public void sendMessage(String... messages) {
+                    for (String msg : messages) {
+                        sendMessage(msg);
+                    }
+                }
+
+                // 兼容 1.16+ 的 UUID 发送方法
+                public void sendMessage(java.util.UUID uuid, String message) {
+                    sendMessage(message);
+                }
+
+                public void sendMessage(java.util.UUID uuid, String... messages) {
+                    sendMessage(messages);
+                }
+
+                @Override
+                public org.bukkit.Server getServer() { return player.getServer(); }
+
+                @Override
+                public String getName() { return player.getName(); }
+
+                @Override
+                public org.bukkit.command.CommandSender.Spigot spigot() {
+                    return new org.bukkit.command.CommandSender.Spigot() {
+                        @Override
+                        public void sendMessage(net.md_5.bungee.api.chat.BaseComponent component) {
+                            interceptorWrapper[0].sendMessage(net.md_5.bungee.api.chat.TextComponent.toLegacyText(component));
+                        }
+
+                        @Override
+                        public void sendMessage(net.md_5.bungee.api.chat.BaseComponent... components) {
+                            interceptorWrapper[0].sendMessage(net.md_5.bungee.api.chat.TextComponent.toLegacyText(components));
+                        }
+                        
+                        // 兼容某些版本的 Spigot
+                        public void sendMessage(java.util.UUID uuid, net.md_5.bungee.api.chat.BaseComponent component) {
+                            sendMessage(component);
+                        }
+                        public void sendMessage(java.util.UUID uuid, net.md_5.bungee.api.chat.BaseComponent... components) {
+                            sendMessage(components);
+                        }
+                    };
+                }
+
+                @Override
+                public boolean isPermissionSet(String name) { return player.isPermissionSet(name); }
+
+                @Override
+                public boolean isPermissionSet(org.bukkit.permissions.Permission perm) { return player.isPermissionSet(perm); }
+
+                @Override
+                public boolean hasPermission(String name) { return player.hasPermission(name); }
+
+                @Override
+                public boolean hasPermission(org.bukkit.permissions.Permission perm) { return player.hasPermission(perm); }
+
+                @Override
+                public org.bukkit.permissions.PermissionAttachment addAttachment(org.bukkit.plugin.Plugin plugin, String name, boolean value) { return player.addAttachment(plugin, name, value); }
+
+                @Override
+                public org.bukkit.permissions.PermissionAttachment addAttachment(org.bukkit.plugin.Plugin plugin) { return player.addAttachment(plugin); }
+
+                @Override
+                public org.bukkit.permissions.PermissionAttachment addAttachment(org.bukkit.plugin.Plugin plugin, String name, boolean value, int ticks) { return player.addAttachment(plugin, name, value, ticks); }
+
+                @Override
+                public org.bukkit.permissions.PermissionAttachment addAttachment(org.bukkit.plugin.Plugin plugin, int ticks) { return player.addAttachment(plugin, ticks); }
+
+                @Override
+                public void removeAttachment(org.bukkit.permissions.PermissionAttachment attachment) { player.removeAttachment(attachment); }
+
+                @Override
+                public void recalculatePermissions() { player.recalculatePermissions(); }
+
+                @Override
+                public java.util.Set<org.bukkit.permissions.PermissionAttachmentInfo> getEffectivePermissions() { return player.getEffectivePermissions(); }
+
+                @Override
+                public boolean isOp() { return player.isOp(); }
+
+                @Override
+                public void setOp(boolean value) { player.setOp(value); }
+            };
+
+            boolean success = Bukkit.dispatchCommand(interceptorWrapper[0], command);
+            
+            String finalResult;
+            if (output.length() > 0) {
+                finalResult = output.toString();
+            } else {
+                finalResult = success ? "命令执行成功" : "命令执行失败";
+            }
+            
+            player.sendMessage(ChatColor.GRAY + "⇒ 反馈已发送至 Agent");
+            
+            // 将详细结果反馈给 AI
+            feedbackToAI(player, "#run_result: " + finalResult);
         });
     }
 
@@ -546,7 +653,32 @@ public class CLIManager {
     }
 
     private void feedbackToAI(Player player, String feedback) {
-        processAIMessage(player, feedback);
+        UUID uuid = player.getUniqueId();
+        DialogueSession session = sessions.get(uuid);
+        if (session == null) return;
+
+        session.addMessage("user", feedback);
+        isGenerating.put(uuid, true);
+
+        // 工具返回信息不显示给玩家，仅在日志记录并触发 AI 思考
+        plugin.getLogger().info("[CLI] Feedback sent to AI for " + player.getName() + ": " + feedback);
+        
+        // 异步调用 AI，不显示 "Thought..." 提示，因为这是后台自动反馈
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                String systemPrompt = promptManager.getBaseSystemPrompt();
+                String response = ai.chat(session, systemPrompt);
+
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    handleAIResponse(player, response);
+                });
+            } catch (IOException e) {
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    player.sendMessage(ChatColor.RED + "AI 调用出错: " + e.getMessage());
+                    isGenerating.put(uuid, false);
+                });
+            }
+        });
     }
 
     private void displayAgentContent(Player player, String content) {
