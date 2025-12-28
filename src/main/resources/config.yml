@@ -1,0 +1,15 @@
+# CloudFlare Workers AI Configuration
+cloudflare:
+  account_id: ""
+  api_token: ""
+  model: "@cf/meta/llama-3.1-8b-instruct"
+
+# Search Configuration
+search:
+  tencent_secret_id: ""
+  tencent_secret_key: ""
+
+# CLI Mode settings
+settings:
+  timeout_minutes: 10
+  token_warning_threshold: 500
