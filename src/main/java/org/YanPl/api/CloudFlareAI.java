@@ -15,9 +15,11 @@ import java.util.concurrent.TimeUnit;
  */
 public class CloudFlareAI {
     private static final String API_BASE_URL = "https://api.cloudflare.com/client/v4/accounts/%s/ai/run/%s";
+    private static final String ACCOUNTS_URL = "https://api.cloudflare.com/client/v4/accounts";
     private final MineAgent plugin;
     private final OkHttpClient httpClient;
     private final Gson gson = new Gson();
+    private String cachedAccountId = null;
 
     public CloudFlareAI(MineAgent plugin) {
         this.plugin = plugin;
@@ -29,16 +31,52 @@ public class CloudFlareAI {
     }
 
     /**
+     * 自动获取 CloudFlare Account ID
+     */
+    private String fetchAccountId() throws IOException {
+        if (cachedAccountId != null) return cachedAccountId;
+
+        String cfKey = plugin.getConfigManager().getCloudflareCfKey();
+        if (cfKey.isEmpty()) {
+            throw new IOException("错误: 请先在配置文件中设置 cloudflare.cf_key。");
+        }
+
+        Request request = new Request.Builder()
+                .url(ACCOUNTS_URL)
+                .addHeader("Authorization", "Bearer " + cfKey)
+                .get()
+                .build();
+
+        try (Response response = httpClient.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("获取 Account ID 失败: " + response.code() + " " + response.message());
+            }
+
+            String responseBody = response.body().string();
+            JsonObject resultJson = gson.fromJson(responseBody, JsonObject.class);
+            
+            if (resultJson.has("result") && resultJson.getAsJsonArray("result").size() > 0) {
+                cachedAccountId = resultJson.getAsJsonArray("result").get(0).getAsJsonObject().get("id").getAsString();
+                return cachedAccountId;
+            } else {
+                throw new IOException("未找到关联的 CloudFlare 账户，请检查 cf_key 权限。");
+            }
+        }
+    }
+
+    /**
      * 发送对话请求
      */
     public String chat(DialogueSession session, String systemPrompt) throws IOException {
-        String accountId = plugin.getConfigManager().getCloudflareAccountId();
+        String cfKey = plugin.getConfigManager().getCloudflareCfKey();
         String model = plugin.getConfigManager().getCloudflareModel();
-        String apiToken = plugin.getConfigManager().getCloudflareApiToken();
 
-        if (accountId.isEmpty() || apiToken.isEmpty()) {
-            return "错误: 请先在配置文件中设置 CloudFlare Account ID 和 API Token。";
+        if (cfKey.isEmpty()) {
+            return "错误: 请先在配置文件中设置 CloudFlare cf_key。";
         }
+
+        // 自动获取 Account ID
+        String accountId = fetchAccountId();
 
         String url = String.format(API_BASE_URL, accountId, model);
 
@@ -68,7 +106,7 @@ public class CloudFlareAI {
 
         Request request = new Request.Builder()
                 .url(url)
-                .addHeader("Authorization", "Bearer " + apiToken)
+                .addHeader("Authorization", "Bearer " + cfKey)
                 .post(body)
                 .build();
 

@@ -1,8 +1,6 @@
 # CloudFlare Workers AI Configuration
 cloudflare:
-  account_id: ""
-  api_token: ""
-  model: "@cf/meta/llama-3.1-8b-instruct"
+  cf_key: ""
 
 # Search Configuration
 search:

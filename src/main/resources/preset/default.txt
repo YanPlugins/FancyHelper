@@ -1,3 +1,0 @@
-这是 MineAgent 的默认预设文件。
-你可以在这里放置关于常用插件（如 CoreProtect, Vault, PlaceholderAPI）的使用说明。
-AI 会根据需要通过 #get 工具读取这些文件。

@@ -25,17 +25,10 @@ public class ConfigManager {
     }
 
     /**
-     * 获取 CloudFlare 账户 ID
+     * 获取 CloudFlare API Token (cf_key)
      */
-    public String getCloudflareAccountId() {
-        return config.getString("cloudflare.account_id", "");
-    }
-
-    /**
-     * 获取 CloudFlare API Token
-     */
-    public String getCloudflareApiToken() {
-        return config.getString("cloudflare.api_token", "");
+    public String getCloudflareCfKey() {
+        return config.getString("cloudflare.cf_key", "");
     }
 
     /**
