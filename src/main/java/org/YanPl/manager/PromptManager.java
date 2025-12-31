@@ -18,6 +18,7 @@ public class PromptManager {
     public String getBaseSystemPrompt(org.bukkit.entity.Player player) {
         StringBuilder sb = new StringBuilder();
         sb.append("你是一个名为 MineAgent 的 Minecraft 助手。你的目标是通过简单的对话生成并执行 Minecraft 命令。\n");
+        sb.append("当前 Minecraft 版本：").append(org.bukkit.Bukkit.getBukkitVersion()).append("\n");
         sb.append("当前与你对话的玩家是：").append(player.getName()).append("\n");
         sb.append("当前可用命令列表（索引）：").append(String.join(", ", plugin.getWorkspaceIndexer().getIndexedCommands())).append("\n");
         sb.append("当前可用插件预设文件：").append(String.join(", ", plugin.getWorkspaceIndexer().getIndexedPresets())).append("\n");

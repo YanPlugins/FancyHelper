@@ -491,7 +491,24 @@ public class CLIManager {
 
                     // 其他方法（权限检查、名字等）委托给原玩家
                     try {
-                        return method.invoke(player, args);
+                        Object result = method.invoke(player, args);
+                        // 如果方法返回 null 且返回类型是基本类型，需要返回对应的默认值
+                        if (result == null && method.getReturnType().isPrimitive()) {
+                            Class<?> returnType = method.getReturnType();
+                            if (returnType == boolean.class) return false;
+                            if (returnType == int.class) return 0;
+                            if (returnType == double.class) return 0.0;
+                            if (returnType == float.class) return 0.0f;
+                            if (returnType == long.class) return 0L;
+                            if (returnType == byte.class) return (byte) 0;
+                            if (returnType == short.class) return (short) 0;
+                            if (returnType == char.class) return '\0';
+                        }
+                        return result;
+                    } catch (java.lang.reflect.InvocationTargetException e) {
+                        // 记录异常但不崩溃，尽量让命令继续执行
+                        plugin.getLogger().warning("[CLI] Method " + methodName + " threw exception: " + e.getCause().getMessage());
+                        throw e.getCause();
                     } catch (Exception e) {
                         return null;
                     }
@@ -500,13 +517,18 @@ public class CLIManager {
 
             boolean success = false;
             try {
+                // 优先尝试使用拦截器执行，以捕获输出
                 success = Bukkit.dispatchCommand(interceptor, command);
             } catch (Throwable t) {
-                // 如果拦截器执行失败，退回到使用玩家身份执行
+                // 如果拦截器执行过程中抛出异常（通常是因为类型转换失败），则退回到使用玩家身份执行
                 plugin.getLogger().warning("[CLI] Interceptor failed for command '" + command + "': " + t.getMessage());
+                
+                // 在退回执行前，如果是因为拦截器导致的问题，我们尝试直接运行
                 success = player.performCommand(command);
+                
                 if (output.length() == 0) {
-                    output.append("(系统未能捕获此命令的详细输出，很有可能是该命令不支持被拦截或语法错误)");
+                    // 如果退回执行后依然没有输出，可能是命令本身就没有输出，或者是非法命令
+                    // 我们不做任何处理，让下方的 success 判断来决定最终结果
                 }
             }
             

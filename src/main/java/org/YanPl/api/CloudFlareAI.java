@@ -115,16 +115,25 @@ public class CloudFlareAI {
 
         if (model.contains("gpt-oss")) {
             // 对于 gpt-oss-120b，使用 Responses API 专有的 instructions 字段设置系统提示词
-            bodyJson.addProperty("instructions", systemPrompt);
+            bodyJson.addProperty("instructions", systemPrompt != null ? systemPrompt : "");
             
             // 构建消息历史
             for (DialogueSession.Message msg : session.getHistory()) {
                 String content = msg.getContent();
-                if (content == null || content.isEmpty()) continue;
+                String role = msg.getRole();
+                if (content == null || content.isEmpty() || role == null || role.isEmpty()) continue;
                 
                 JsonObject m = new JsonObject();
-                m.addProperty("role", msg.getRole());
+                m.addProperty("role", role);
                 m.addProperty("content", content);
+                messagesArray.add(m);
+            }
+
+            // 如果没有任何消息历史，至少添加一条占位符消息，防止 API 报错
+            if (messagesArray.size() == 0) {
+                JsonObject m = new JsonObject();
+                m.addProperty("role", "user");
+                m.addProperty("content", "Hello");
                 messagesArray.add(m);
             }
 
