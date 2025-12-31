@@ -712,10 +712,6 @@ public class CLIManager {
         return "未找到相关全网搜索结果。";
     }
 
-    private boolean searchResultsExist(com.google.gson.JsonArray topics) {
-        return topics != null && topics.size() > 0;
-    }
-
     private void feedbackToAI(Player player, String feedback) {
         UUID uuid = player.getUniqueId();
         DialogueSession session = sessions.get(uuid);
@@ -796,7 +792,6 @@ public class CLIManager {
     }
 
     public ChatColor getActivePlayersCount() {
-        // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'getActivePlayersCount'");
     }
 }
