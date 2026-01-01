@@ -111,7 +111,7 @@ public class ConfigManager {
      * 获取 AI 模型名称
      */
     public String getCloudflareModel() {
-        return "@cf/openai/gpt-oss-120b";
+        return config.getString("cloudflare.model", "@cf/openai/gpt-oss-120b");
     }
 
     /**

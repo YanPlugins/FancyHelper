@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit;
  * CloudFlare Workers AI API 集成
  */
 public class CloudFlareAI {
-    private static final String API_RUN_URL = "https://api.cloudflare.com/client/v4/accounts/%s/ai/run/%s";
+    private static final String API_RESPONSES_URL = "https://api.cloudflare.com/client/v4/accounts/%s/ai/v1/responses";
     private static final String ACCOUNTS_URL = "https://api.cloudflare.com/client/v4/accounts";
     private final MineAgent plugin;
     private final OkHttpClient httpClient;
@@ -101,13 +101,14 @@ public class CloudFlareAI {
             throw e;
         }
 
-        // 使用标准的 /ai/run/{model} 接口，这是 CloudFlare Workers AI 最稳定的接口
-        String url = String.format(API_RUN_URL, accountId, model);
+        // 使用 /ai/v1/responses 接口，这是 gpt-oss-120b 推荐的接口
+        String url = String.format(API_RESPONSES_URL, accountId);
         plugin.getLogger().info("[AI Request] URL: " + url);
 
         JsonArray messagesArray = new JsonArray();
 
-        // 1. 添加系统提示词 (role: system)
+        // 1. 添加系统提示词 (对于 gpt-oss-120b，系统提示词通常作为第一条消息或使用 instructions 字段)
+        // 根据文档，我们将其作为 messages 的一部分放入 input
         if (systemPrompt != null && !systemPrompt.isEmpty()) {
             JsonObject systemMsg = new JsonObject();
             systemMsg.addProperty("role", "system");
@@ -135,15 +136,16 @@ public class CloudFlareAI {
             messagesArray.add(m);
         }
 
-        // 构建请求体
+        // 构建符合 /ai/v1/responses 接口要求的请求体
         JsonObject bodyJson = new JsonObject();
-        bodyJson.add("messages", messagesArray);
-
-        // 如果是 gpt-oss-120b，尝试添加推理参数 (如果支持)
+        bodyJson.addProperty("model", model);
+        bodyJson.add("input", messagesArray);
+        
+        // 如果是 gpt-oss 模型，添加推理参数
         if (model.contains("gpt-oss")) {
-            // 注意：有些模型可能需要特定的参数名，这里先使用标准格式
-            // 如果仍然报错，可以考虑移除这些额外参数
-            bodyJson.addProperty("max_tokens", 2048);
+            JsonObject reasoning = new JsonObject();
+            reasoning.addProperty("effort", "medium");
+            bodyJson.add("reasoning", reasoning);
         }
         
         String bodyString = gson.toJson(bodyJson);
