@@ -548,15 +548,15 @@ public class CLIManager {
                 // 优先尝试使用拦截器执行，以捕获输出
                 success = Bukkit.dispatchCommand(interceptor, command);
             } catch (Throwable t) {
-                // 如果拦截器执行过程中抛出异常（通常是因为类型转换失败），则退回到使用玩家身份执行
-                plugin.getLogger().warning("[CLI] Interceptor failed for command '" + command + "': " + t.getMessage());
-                
-                // 在退回执行前，如果是因为拦截器导致的问题，我们尝试直接运行
-                success = player.performCommand(command);
-                
-                if (output.length() == 0) {
-                    // 如果退回执行后依然没有输出，可能是命令本身就没有输出，或者是非法命令
-                    // 我们不做任何处理，让下方的 success 判断来决定最终结果
+                // 如果拦截器执行过程中抛出异常（通常是因为类型转换失败，如 VanillaCommandWrapper）
+                // 针对原版命令，我们尝试使用 execute 包装器来绕过类型检查
+                try {
+                    String wrappedCommand = "execute as " + player.getName() + " run " + command;
+                    success = Bukkit.dispatchCommand(interceptor, wrappedCommand);
+                } catch (Throwable t2) {
+                    plugin.getLogger().warning("[CLI] Interceptor failed even with wrapped command: " + t2.getMessage());
+                    // 最后的手段：退回到使用真实玩家身份执行，但这意味着无法捕获输出
+                    success = player.performCommand(command);
                 }
             }
 
