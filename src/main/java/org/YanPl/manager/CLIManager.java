@@ -267,6 +267,8 @@ public class CLIManager {
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     player.sendMessage(ChatColor.RED + "AI 调用出错: " + e.getMessage());
                     isGenerating.put(uuid, false);
+                    // 移除导致失败的消息，防止污染后续对话
+                    session.removeLastMessage();
                 });
             }
         });

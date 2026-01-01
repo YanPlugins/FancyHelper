@@ -175,8 +175,27 @@ public class CloudFlareAI {
 
             JsonObject responseJson = gson.fromJson(responseBody, JsonObject.class);
             
-            // 标准 /run 接口返回格式通常是 { "result": { "response": "..." }, "success": true }
-            // 或者 { "result": { "choices": [ { "message": { "content": "..." } } ] } }
+            // 1. 处理新的 /ai/v1/responses (Responses API) 格式
+            // 格式: { "output": [ { "type": "message", "content": [ { "type": "output_text", "text": "..." } ] } ] }
+            if (responseJson.has("output") && responseJson.get("output").isJsonArray()) {
+                JsonArray outputArray = responseJson.getAsJsonArray("output");
+                for (int i = 0; i < outputArray.size(); i++) {
+                    JsonObject item = outputArray.get(i).getAsJsonObject();
+                    if (item.has("type") && "message".equals(item.get("type").getAsString())) {
+                        if (item.has("content") && item.get("content").isJsonArray()) {
+                            JsonArray contents = item.getAsJsonArray("content");
+                            for (int j = 0; j < contents.size(); j++) {
+                                JsonObject contentObj = contents.get(j).getAsJsonObject();
+                                if (contentObj.has("type") && "output_text".equals(contentObj.get("type").getAsString())) {
+                                    return contentObj.get("text").getAsString();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. 处理标准 /run 接口返回格式 (备选)
             if (responseJson.has("result")) {
                 JsonObject result = responseJson.getAsJsonObject("result");
                 
