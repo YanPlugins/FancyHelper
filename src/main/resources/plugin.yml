@@ -1,5 +1,5 @@
 name: MineAgent
-version: v1.1.1
+version: v1.1.2
 main: org.YanPl.MineAgent
 api-version: '1.18'
 authors: [ baicaizhale ]
