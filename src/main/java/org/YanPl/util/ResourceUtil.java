@@ -3,7 +3,6 @@ package org.YanPl.util;
 import org.YanPl.MineAgent;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
 import java.util.Enumeration;
