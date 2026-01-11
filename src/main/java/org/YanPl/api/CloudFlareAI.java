@@ -38,12 +38,30 @@ public class CloudFlareAI {
      * 关闭 HTTP 客户端，释放资源
      */
     public void shutdown() {
-        httpClient.dispatcher().executorService().shutdown();
-        httpClient.connectionPool().evictAll();
-        if (httpClient.cache() != null) {
-            try {
-                httpClient.cache().close();
-            } catch (IOException ignored) {}
+        try {
+            // 关闭dispatcher中的所有待执行任务
+            httpClient.dispatcher().executorService().shutdown();
+            // 等待最多5秒让任务完成
+            if (!httpClient.dispatcher().executorService().awaitTermination(5, TimeUnit.SECONDS)) {
+                httpClient.dispatcher().executorService().shutdownNow();
+                plugin.getLogger().warning("[CloudFlareAI] Executor service did not terminate in time, forcing shutdown.");
+            }
+            
+            // 清空连接池
+            httpClient.connectionPool().evictAll();
+            
+            // 关闭缓存
+            if (httpClient.cache() != null) {
+                try {
+                    httpClient.cache().close();
+                } catch (IOException ignored) {}
+            }
+            
+            plugin.getLogger().info("[CloudFlareAI] HTTP client shutdown completed.");
+        } catch (InterruptedException e) {
+            httpClient.dispatcher().executorService().shutdownNow();
+            plugin.getLogger().warning("[CloudFlareAI] Shutdown interrupted: " + e.getMessage());
+            Thread.currentThread().interrupt();
         }
     }
 

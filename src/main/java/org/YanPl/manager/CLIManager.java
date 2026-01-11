@@ -108,9 +108,24 @@ public class CLIManager {
      * 关闭管理器，清理资源
      */
     public void shutdown() {
-        ai.shutdown();
-        sessions.clear();
+        plugin.getLogger().info("[CLI] Shutting down CLIManager...");
+        
+        // 移除所有活跃的CLI玩家
+        for (UUID uuid : new ArrayList<>(activeCLIPayers)) {
+            sessions.remove(uuid);
+        }
         activeCLIPayers.clear();
+        pendingAgreementPlayers.clear();
+        sessions.clear();
+        isGenerating.clear();
+        pendingCommands.clear();
+        
+        // 关闭AI客户端（这会处理OkHttp的cleanup）
+        if (ai != null) {
+            ai.shutdown();
+        }
+        
+        plugin.getLogger().info("[CLI] CLIManager shutdown completed.");
     }
 
     /**
