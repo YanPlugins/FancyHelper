@@ -6,6 +6,7 @@ import org.YanPl.manager.CLIManager;
 import org.YanPl.manager.ConfigManager;
 import org.YanPl.manager.WorkspaceIndexer;
 import org.bstats.bukkit.Metrics;
+import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class MineAgent extends JavaPlugin {
@@ -21,9 +22,10 @@ public final class MineAgent extends JavaPlugin {
         // 初始化配置管理器
         configManager = new ConfigManager(this);
         
-        // 初始化工作区索引器并执行索引
+        // 初始化工作区索引器
         workspaceIndexer = new WorkspaceIndexer(this);
-        workspaceIndexer.indexAll();
+        // 异步执行索引，避免阻塞主线程
+        Bukkit.getScheduler().runTaskAsynchronously(this, () -> workspaceIndexer.indexAll());
 
         // 初始化 CLI 管理器
         cliManager = new CLIManager(this);
