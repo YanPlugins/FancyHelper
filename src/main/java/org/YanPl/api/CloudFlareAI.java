@@ -206,7 +206,10 @@ public class CloudFlareAI {
                             for (int j = 0; j < contents.size(); j++) {
                                 JsonObject contentObj = contents.get(j).getAsJsonObject();
                                 if (contentObj.has("type") && "output_text".equals(contentObj.get("type").getAsString())) {
-                                    return contentObj.get("text").getAsString();
+                                    String text = contentObj.get("text").getAsString();
+                                    if (text != null) {
+                                        return text;
+                                    }
                                 }
                             }
                         }
@@ -218,7 +221,10 @@ public class CloudFlareAI {
             if (responseJson.has("result")) {
                 JsonObject result = responseJson.getAsJsonObject("result");
                 if (result.has("response")) {
-                    return result.get("response").getAsString();
+                    String responseText = result.get("response").getAsString();
+                    if (responseText != null) {
+                        return responseText;
+                    }
                 }
             }
 
@@ -226,7 +232,10 @@ public class CloudFlareAI {
             if (responseJson.has("result")) {
                 JsonObject result = responseJson.getAsJsonObject("result");
                 if (result.has("text")) {
-                    return result.get("text").getAsString();
+                    String text = result.get("text").getAsString();
+                    if (text != null) {
+                        return text;
+                    }
                 }
             }
 
