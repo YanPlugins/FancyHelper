@@ -115,26 +115,32 @@ public class CloudFlareAI {
         // 1. 添加系统提示词 (作为 system 角色消息加入 input 数组)
         // 注意：某些模型可能不支持 instructions 字段，或者该字段导致了 token 错误
         // 我们尝试标准的 system message 方式
-        if (systemPrompt != null && !systemPrompt.isEmpty()) {
-            JsonObject systemMsg = new JsonObject();
-            systemMsg.addProperty("role", "system");
-            systemMsg.addProperty("content", systemPrompt);
-            messagesArray.add(systemMsg);
-        }
+        String safeSystemPrompt = (systemPrompt != null && !systemPrompt.isEmpty()) ? systemPrompt : "You are a helpful assistant.";
+        JsonObject systemMsg = new JsonObject();
+        systemMsg.addProperty("role", "system");
+        systemMsg.addProperty("content", safeSystemPrompt);
+        messagesArray.add(systemMsg);
+        plugin.getLogger().info("[AI Request] System prompt added (length: " + safeSystemPrompt.length() + ")");
 
         // 2. 添加历史记录 (role: user/assistant)
         for (DialogueSession.Message msg : session.getHistory()) {
             String content = msg.getContent();
             String role = msg.getRole();
-            if (content == null || content.isEmpty() || role == null || role.isEmpty()) continue;
+            
+            // 严格检查：跳过任何null或空的内容
+            if (content == null || content.trim().isEmpty() || role == null || role.trim().isEmpty()) {
+                plugin.getLogger().warning("[AI Request] Skipping message with null/empty content or role");
+                continue;
+            }
             
             // 之前的逻辑跳过了 system 消息，现在我们需要确保不重复添加
             if ("system".equalsIgnoreCase(role)) continue;
             
             JsonObject m = new JsonObject();
-            m.addProperty("role", role);
-            m.addProperty("content", content);
+            m.addProperty("role", role.trim());
+            m.addProperty("content", content.trim());
             messagesArray.add(m);
+            plugin.getLogger().info("[AI Request] Added message - Role: " + role + ", Content length: " + content.length());
         }
 
         // 如果没有任何消息，至少添加一条占位符消息
@@ -165,11 +171,18 @@ public class CloudFlareAI {
         String bodyString = gson.toJson(bodyJson);
 
         plugin.getLogger().info("[AI Request] Model: " + model);
+        plugin.getLogger().info("[AI Request] Total messages in array: " + messagesArray.size());
         // 打印部分 Payload 以供调试
         if (bodyString.length() > 1000) {
             plugin.getLogger().info("[AI Request] Payload (Partial): " + bodyString.substring(0, 1000) + "...");
         } else {
             plugin.getLogger().info("[AI Request] Payload: " + bodyString);
+        }
+        
+        // 验证payload中没有null values
+        if (bodyString.contains("\"content\":null")) {
+            plugin.getLogger().severe("[AI Error] Payload contains null content! This will cause API error.");
+            throw new IOException("Payload validation failed: null content detected");
         }
 
         RequestBody body = RequestBody.create(
