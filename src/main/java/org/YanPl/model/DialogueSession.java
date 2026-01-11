@@ -60,8 +60,8 @@ public class DialogueSession {
         private final String content;
 
         public Message(String role, String content) {
-            this.role = role;
-            this.content = content;
+            this.role = role != null ? role : "user";
+            this.content = content != null ? content : "";
         }
 
         public String getRole() {
