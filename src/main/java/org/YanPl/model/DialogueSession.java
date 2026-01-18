@@ -3,10 +3,10 @@ package org.YanPl.model;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 对话会话模型，存储对话历史
- */
 public class DialogueSession {
+    /**
+     * DialogueSession 保存简短的对话历史与最近活动时间，用于与 AI 交互时传递上下文。
+     */
     private final List<Message> history = new ArrayList<>();
     private long lastActivityTime;
 
@@ -15,11 +15,12 @@ public class DialogueSession {
     }
 
     public void addMessage(String role, String content) {
+        // 添加消息并更新活动时间；限制历史长度以节省 token
         history.add(new Message(role, content));
         this.lastActivityTime = System.currentTimeMillis();
         
-        // 简单的历史记录剪裁，防止 Token 超出过多（假设最大 10 轮对话）
         if (history.size() > 20) {
+            // 移除最早的两条，保持历史在一个较小范围
             history.remove(0);
             history.remove(0);
         }
@@ -30,11 +31,12 @@ public class DialogueSession {
     }
 
     public int getEstimatedTokens() {
+        // 粗略估算 token：每 4 个字符为 1 token（近似值）
         int chars = 0;
         for (Message msg : history) {
             chars += msg.getContent().length();
         }
-        return chars / 4; // 粗略估计：4个字符1个Token
+        return chars / 4;
     }
 
     public long getLastActivityTime() {

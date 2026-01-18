@@ -2,20 +2,18 @@ package org.YanPl.manager;
 
 import org.YanPl.MineAgent;
 
-/**
- * 提示词管理器，负责生成系统提示词
- */
 public class PromptManager {
+    /**
+     * Prompt 管理器：构建发给 AI 的基础系统提示，包含玩家与索引信息。
+     */
     private final MineAgent plugin;
 
     public PromptManager(MineAgent plugin) {
         this.plugin = plugin;
     }
 
-    /**
-     * 生成基础系统提示词
-     */
     public String getBaseSystemPrompt(org.bukkit.entity.Player player) {
+        // 构建包含上下文（Minecraft 版本、玩家、命令索引与预设文件）的系统提示
         StringBuilder sb = new StringBuilder();
         sb.append("你是一个名为 MineAgent 的 Minecraft 助手。你的目标是通过简单的对话生成并执行 Minecraft 命令。\n");
         sb.append("当前 Minecraft 版本：").append(org.bukkit.Bukkit.getBukkitVersion()).append("\n");
@@ -39,7 +37,6 @@ public class PromptManager {
         sb.append("   - **不要** 盲目重复执行相同的命令。\n");
         sb.append("   - 如果你是在查询某个状态（如 gamerule），你可以假设命令已执行，并建议玩家查看他们的聊天栏反馈。\n");
         sb.append("   - 你也可以尝试换一种方式，例如对于 gamerule，直接告诉玩家已经发起了查询。\n");
-        // sb.append("5. 你的思考过程（Thought）不应展示给用户，只需输出最终正文和工具调用。\n");
         
         return sb.toString(); 
     }

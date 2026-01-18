@@ -861,13 +861,17 @@ public class CLIManager {
 
     private void sendEnterMessage(Player player) {
         player.sendMessage(ChatColor.GRAY + "==================");
+        player.sendMessage("");
         player.sendMessage(ChatColor.WHITE + "CLI Powering");
+        player.sendMessage("");
         player.sendMessage(ChatColor.GRAY + "==================");
     }
 
     private void sendExitMessage(Player player) {
         player.sendMessage(ChatColor.GRAY + "==================");
+        player.sendMessage("");
         player.sendMessage(ChatColor.WHITE + "已退出 CLI Mode");
+        player.sendMessage("");
         player.sendMessage(ChatColor.GRAY + "==================");
     }
 

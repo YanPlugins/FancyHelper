@@ -14,7 +14,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * CLI 命令处理器，负责处理 /cli 及其子命令
+ * /mineagent 命令的处理器。
+ * 提供切换 CLI、重载、查看状态等子命令，并支持 Tab 完成。
  */
 public class CLICommand implements CommandExecutor, TabCompleter {
     private final MineAgent plugin;
@@ -25,6 +26,7 @@ public class CLICommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        // 命令入口：只允许玩家使用
         if (!(sender instanceof Player)) {
             sender.sendMessage(ChatColor.RED + "该命令仅限玩家使用。");
             return true;
@@ -33,7 +35,6 @@ public class CLICommand implements CommandExecutor, TabCompleter {
         Player player = (Player) sender;
 
         if (args.length == 0) {
-            // /cli - 切换 CLI 模式
             if (!player.hasPermission("mineagent.cli")) {
                 player.sendMessage(ChatColor.RED + "你没有权限使用此命令。");
                 return true;
@@ -74,19 +75,13 @@ public class CLICommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    /**
-     * 切换玩家的 CLI 模式
-     */
     private void toggleCLIMode(Player player) {
+        // 切换玩家的 CLI 模式
         plugin.getCliManager().toggleCLI(player);
     }
 
-    /**
-     * 处理重载子命令
-     */
     private void handleReload(Player player, String[] args) {
         if (args.length == 1) {
-            // /cli reload
             plugin.getConfigManager().loadConfig();
             plugin.getWorkspaceIndexer().indexAll();
             player.sendMessage(ChatColor.GREEN + "配置与工作区已重新加载。");
@@ -104,9 +99,6 @@ public class CLICommand implements CommandExecutor, TabCompleter {
         }
     }
 
-    /**
-     * 显示插件当前状态
-     */
     private void handleStatus(Player player) {
         player.sendMessage(ChatColor.AQUA + "=== MineAgent 状态 ===");
         player.sendMessage(ChatColor.WHITE + "已索引命令: " + ChatColor.YELLOW + plugin.getWorkspaceIndexer().getIndexedCommands().size());
