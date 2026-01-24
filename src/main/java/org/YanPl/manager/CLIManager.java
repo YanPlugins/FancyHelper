@@ -887,7 +887,7 @@ public class CLIManager {
     private void sendEnterMessage(Player player) {
         player.sendMessage(ChatColor.GRAY + "==================");
         player.sendMessage("");
-        player.sendMessage(ChatColor.WHITE + "Chating with Fancy");
+        player.sendMessage(ChatColor.WHITE + "Chatting with Fancy");
         player.sendMessage("");
         player.sendMessage(ChatColor.GRAY + "==================");
     }
