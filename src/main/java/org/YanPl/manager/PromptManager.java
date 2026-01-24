@@ -2,6 +2,9 @@ package org.YanPl.manager;
 
 import org.YanPl.FancyHelper;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 public class PromptManager {
     /**
      * Prompt 管理器：构建发给 AI 的基础系统提示，包含玩家与索引信息。
@@ -17,6 +20,11 @@ public class PromptManager {
         StringBuilder sb = new StringBuilder();
         sb.append("你是一个名为 Fancy 的 Minecraft 助手。你的目标是通过简单的对话生成并执行 Minecraft 命令。\n");
         sb.append("当前 Minecraft 版本：").append(org.bukkit.Bukkit.getBukkitVersion()).append("\n");
+        
+        // 添加当前时间信息
+        LocalDateTime now = LocalDateTime.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        sb.append("当前现实时间：").append(now.format(formatter)).append("\n");
         sb.append("当前与你对话的玩家是：").append(player.getName()).append("\n");
         sb.append("当前可用命令列表（索引）：").append(String.join(", ", plugin.getWorkspaceIndexer().getIndexedCommands())).append("\n");
         sb.append("当前可用插件预设文件：").append(String.join(", ", plugin.getWorkspaceIndexer().getIndexedPresets())).append("\n");
