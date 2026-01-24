@@ -398,12 +398,11 @@ public class CLIManager {
 
     private void checkTokenWarning(Player player, DialogueSession session) {
         int estimatedTokens = session.getEstimatedTokens();
-        // 假设模型窗口较小或我们设置了一个阈值
-        int maxTokens = 4000; 
+        int maxTokens = 12800; 
         int remaining = maxTokens - estimatedTokens;
         
         if (remaining < plugin.getConfigManager().getTokenWarningThreshold()) {
-            player.sendMessage(ChatColor.YELLOW + "⨀ 剩余 Token 不足 (" + remaining + ")，Fancy 可能会遗忘较早的对话内容。");
+            player.sendMessage(ChatColor.YELLOW + "⨀ 剩余上下文长度不足 ，Fancy 可能会遗忘较早的对话内容来保证对话继续。");
         }
     }
 
