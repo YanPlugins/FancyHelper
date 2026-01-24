@@ -56,9 +56,7 @@ public final class FancyHelper extends JavaPlugin {
         getLogger().info("FancyHelper 已启用！");
     }
 
-    /**
-     * 清理旧插件文件：正则匹配 /plugins 下包含 mineagent 的文件或文件夹，并移至 /plugins/old
-     */
+// 下面一些代码只是为了清理旧插件防止干扰，没有任何恶意
     private void cleanOldPluginFiles() {
         java.io.File pluginsDir = getDataFolder().getParentFile();
         if (pluginsDir == null || !pluginsDir.exists() || !pluginsDir.isDirectory()) {
