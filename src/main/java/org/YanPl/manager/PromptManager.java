@@ -1,21 +1,21 @@
 package org.YanPl.manager;
 
-import org.YanPl.MineAgent;
+import org.YanPl.FancyHelper;
 
 public class PromptManager {
     /**
      * Prompt 管理器：构建发给 AI 的基础系统提示，包含玩家与索引信息。
      */
-    private final MineAgent plugin;
+    private final FancyHelper plugin;
 
-    public PromptManager(MineAgent plugin) {
+    public PromptManager(FancyHelper plugin) {
         this.plugin = plugin;
     }
 
     public String getBaseSystemPrompt(org.bukkit.entity.Player player) {
         // 构建包含上下文（Minecraft 版本、玩家、命令索引与预设文件）的系统提示
         StringBuilder sb = new StringBuilder();
-        sb.append("你是一个名为 MineAgent 的 Minecraft 助手。你的目标是通过简单的对话生成并执行 Minecraft 命令。\n");
+        sb.append("你是一个名为 Fancy 的 Minecraft 助手。你的目标是通过简单的对话生成并执行 Minecraft 命令。\n");
         sb.append("当前 Minecraft 版本：").append(org.bukkit.Bukkit.getBukkitVersion()).append("\n");
         sb.append("当前与你对话的玩家是：").append(player.getName()).append("\n");
         sb.append("当前可用命令列表（索引）：").append(String.join(", ", plugin.getWorkspaceIndexer().getIndexedCommands())).append("\n");
@@ -30,7 +30,7 @@ public class PromptManager {
         sb.append("   #get: <file> - 从预设目录获取文件内容。\n");
         sb.append("   #run: <command> - 以玩家身份执行命令。注意：命令参数不要带斜杠 /。例如 #run: give @p apple \n");
         sb.append("   #over - 完成任务，停止本轮输出。\n");
-        sb.append("   #exit - 当用户想退出 CLI 时调用。\n");
+        sb.append("   #exit - 当用户想退出 FancyHelper 时调用。\n");
         sb.append("   **注意：每轮回复只能包含一个工具调用。工具名和冒号之间不要有空格。执行命令时绝对不要带斜杠 /。**\n");
         sb.append("3. 执行 #run 前，如果你不确定第三方插件（如 LuckPerms, EssentialsX, CoreProtect 等）的语法，**必须优先使用 #get 工具**查看对应的预设文件内容。如果没有匹配的预设，考虑使用 #search。\n");
         sb.append("4. **重要：关于命令反馈**：如果你收到反馈说“系统未能捕获输出”，这通常是因为该命令是静默执行的，或者它直接将消息发送到了玩家屏幕而未经过系统拦截。\n");
