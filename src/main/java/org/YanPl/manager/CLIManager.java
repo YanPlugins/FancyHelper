@@ -406,8 +406,8 @@ public class CLIManager {
         // 统一转换为小写进行匹配
         String lowerToolName = toolName.toLowerCase();
 
-        // 展示给玩家时只显示工具名（如果不是 search 或 run 这种有自己显示逻辑的工具）
-        if (!lowerToolName.equals("#search") && !lowerToolName.equals("#run")) {
+        // 展示给玩家时只显示工具名（如果不是 search, run 或 over 这种有自己显示逻辑或不需要显示的工具）
+        if (!lowerToolName.equals("#search") && !lowerToolName.equals("#run") && !lowerToolName.equals("#over")) {
             player.sendMessage(ChatColor.GRAY + "〇 " + toolName);
         }
 
@@ -887,7 +887,7 @@ public class CLIManager {
     private void sendEnterMessage(Player player) {
         player.sendMessage(ChatColor.GRAY + "==================");
         player.sendMessage("");
-        player.sendMessage(ChatColor.WHITE + "CLI Powering");
+        player.sendMessage(ChatColor.WHITE + "Chating with Fancy");
         player.sendMessage("");
         player.sendMessage(ChatColor.GRAY + "==================");
     }
@@ -902,7 +902,7 @@ public class CLIManager {
 
         player.sendMessage(ChatColor.GRAY + "==================");
         player.sendMessage("");
-        player.sendMessage(ChatColor.WHITE + "已退出 CLI Mode");
+        player.sendMessage(ChatColor.WHITE + "已退出 FancyHelper");
         player.sendMessage(ChatColor.GRAY + "消耗 Token: " + (tokens + thoughtTokens) + "  | 时长: " + String.format("%.1f", durationSec) + " 秒");
         player.sendMessage("");
         player.sendMessage(ChatColor.GRAY + "==================");

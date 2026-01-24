@@ -44,14 +44,11 @@ public final class FancyHelper extends JavaPlugin {
         checkSecureProfile();
 
         // 打印启动 ASCII 艺术
-        getLogger().info(" _____                      _   _      _                 ");
-        getLogger().info("|  ___|                    | | | |    | |                ");
-        getLogger().info("| |__ __ _ _ __   ___ _   _| |_| | ___| |_ __   ___ _ __ ");
-        getLogger().info("|  __/ _` | '_ \\ / __| | | |  _  |/ _ \\ | '_ \\ / _ \\ '__|");
-        getLogger().info("| | | (_| | | | | (__| |_| | | | |  __/ | |_) |  __/ |   ");
-        getLogger().info("\\_|  \\__,_|_| |_|\\___|\\__, \\_| |_/\\___|_| .__/ \\___|_|   ");
-        getLogger().info("                       __/ |            | |              ");
-        getLogger().info("                      |___/             |_|              ");
+        getLogger().info("    ____                   __ __    __            ");
+        getLogger().info("   / __/__ ____  ______ __/ // /__ / /__  ___ ____ ");
+        getLogger().info("  / _// _ `/ _ \\/ __/ // / _  / -_) / _ \\/ -_) __/ ");
+        getLogger().info(" /_/  \\_,_/_//_/\\__ /\\_, /_//_/\\__/_/ .__/\\__/_/   ");
+        getLogger().info("                   /___/          /_/             ");
 
         getLogger().info("FancyHelper 已启用！");
     }
