@@ -71,6 +71,9 @@ public class CLICommand implements CommandExecutor, TabCompleter {
             case "agree":
                 plugin.getCliManager().handleChat(player, "agree");
                 return true;
+            case "thought":
+                plugin.getCliManager().handleThought(player);
+                return true;
             case "error":
                 if (!player.isOp()) {
                     player.sendMessage(ChatColor.RED + "该测试命令仅限管理员使用。");
@@ -138,7 +141,7 @@ public class CLICommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return Arrays.asList("reload", "status").stream()
+            return Arrays.asList("reload", "status", "thought").stream()
                     .filter(s -> s.startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());
         } else if (args.length == 2 && args[0].equalsIgnoreCase("reload")) {

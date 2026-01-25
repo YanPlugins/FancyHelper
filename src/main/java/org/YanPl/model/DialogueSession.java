@@ -21,6 +21,7 @@ public class DialogueSession {
     private int toolFailureCount = 0;
     private int thoughtTokens = 0;
     private Mode mode = Mode.NORMAL;
+    private String lastThought = null;
 
     public DialogueSession() {
         this.lastActivityTime = System.currentTimeMillis();
@@ -104,6 +105,14 @@ public class DialogueSession {
 
     public void setMode(Mode mode) {
         this.mode = mode;
+    }
+
+    public String getLastThought() {
+        return lastThought;
+    }
+
+    public void setLastThought(String lastThought) {
+        this.lastThought = lastThought;
     }
 
     public static class Message {

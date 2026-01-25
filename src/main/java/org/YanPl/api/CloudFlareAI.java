@@ -5,6 +5,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import okhttp3.*;
 import org.YanPl.FancyHelper;
+import org.YanPl.model.AIResponse;
 import org.YanPl.model.DialogueSession;
 
 import java.io.IOException;
@@ -94,13 +95,13 @@ public class CloudFlareAI {
         }
     }
 
-    public String chat(DialogueSession session, String systemPrompt) throws IOException {
+    public AIResponse chat(DialogueSession session, String systemPrompt) throws IOException {
         // 将会话历史与 systemPrompt 打包为 CloudFlare Responses API 所需的 JSON，发起 HTTP 请求并解析返回
         String cfKey = plugin.getConfigManager().getCloudflareCfKey();
         String model = plugin.getConfigManager().getCloudflareModel();
 
         if (cfKey == null || cfKey.isEmpty()) {
-            return "错误: 请先在配置文件中设置 CloudFlare cf_key。";
+            return new AIResponse("错误: 请先在配置文件中设置 CloudFlare cf_key。", null);
         }
 
         if (model == null || model.isEmpty()) {
@@ -286,6 +287,9 @@ public class CloudFlareAI {
                         }
 
                         JsonObject responseJson = gson.fromJson(simpleRespBody, JsonObject.class);
+                        String textC = null;
+                        String thoughtC = null;
+
                         if (responseJson.has("output") && responseJson.get("output").isJsonArray()) {
                             JsonArray outputArray = responseJson.getAsJsonArray("output");
                             for (int i = 0; i < outputArray.size(); i++) {
@@ -295,9 +299,11 @@ public class CloudFlareAI {
                                         JsonArray contents = item.getAsJsonArray("content");
                                         for (int j = 0; j < contents.size(); j++) {
                                             JsonObject contentObj = contents.get(j).getAsJsonObject();
-                                            if (contentObj.has("type") && "output_text".equals(contentObj.get("type").getAsString())) {
-                                                String text = contentObj.get("text").isJsonNull() ? null : contentObj.get("text").getAsString();
-                                                if (text != null) return text;
+                                            String type = contentObj.has("type") ? contentObj.get("type").getAsString() : "";
+                                            if ("output_text".equals(type)) {
+                                                textC = contentObj.get("text").isJsonNull() ? null : contentObj.get("text").getAsString();
+                                            } else if ("thought".equals(type) || "reasoning".equals(type)) {
+                                                thoughtC = contentObj.get("text").isJsonNull() ? null : contentObj.get("text").getAsString();
                                             }
                                         }
                                     }
@@ -307,14 +313,18 @@ public class CloudFlareAI {
 
                         if (responseJson.has("result")) {
                             JsonObject result = responseJson.getAsJsonObject("result");
-                            if (result.has("response")) {
-                                String r = result.get("response").isJsonNull() ? null : result.get("response").getAsString();
-                                if (r != null) return r;
+                            if (textC == null) {
+                                if (result.has("response")) textC = result.get("response").isJsonNull() ? null : result.get("response").getAsString();
+                                else if (result.has("text")) textC = result.get("text").isJsonNull() ? null : result.get("text").getAsString();
                             }
-                            if (result.has("text")) {
-                                String t = result.get("text").isJsonNull() ? null : result.get("text").getAsString();
-                                if (t != null) return t;
+                            if (thoughtC == null) {
+                                if (result.has("reasoning")) thoughtC = result.get("reasoning").isJsonNull() ? null : result.get("reasoning").getAsString();
+                                else if (result.has("thought")) thoughtC = result.get("thought").isJsonNull() ? null : result.get("thought").getAsString();
                             }
+                        }
+
+                        if (textC != null) {
+                            return new AIResponse(textC, thoughtC);
                         }
                         throw new IOException("无法解析 AI 响应结果(重试): " + simpleRespBody);
                     }
@@ -324,7 +334,9 @@ public class CloudFlareAI {
             }
 
             JsonObject responseJson = gson.fromJson(responseBody, JsonObject.class);
-            
+            String textContent = null;
+            String thoughtContent = null;
+
             if (responseJson.has("output") && responseJson.get("output").isJsonArray()) {
                 JsonArray outputArray = responseJson.getAsJsonArray("output");
                 for (int i = 0; i < outputArray.size(); i++) {
@@ -334,11 +346,11 @@ public class CloudFlareAI {
                             JsonArray contents = item.getAsJsonArray("content");
                             for (int j = 0; j < contents.size(); j++) {
                                 JsonObject contentObj = contents.get(j).getAsJsonObject();
-                                if (contentObj.has("type") && "output_text".equals(contentObj.get("type").getAsString())) {
-                                    String text = contentObj.get("text").getAsString();
-                                    if (text != null) {
-                                        return text;
-                                    }
+                                String type = contentObj.has("type") ? contentObj.get("type").getAsString() : "";
+                                if ("output_text".equals(type)) {
+                                    textContent = contentObj.get("text").getAsString();
+                                } else if ("thought".equals(type) || "reasoning".equals(type)) {
+                                    thoughtContent = contentObj.get("text").getAsString();
                                 }
                             }
                         }
@@ -348,22 +360,18 @@ public class CloudFlareAI {
 
             if (responseJson.has("result")) {
                 JsonObject result = responseJson.getAsJsonObject("result");
-                if (result.has("response")) {
-                    String responseText = result.get("response").getAsString();
-                    if (responseText != null) {
-                        return responseText;
-                    }
+                if (textContent == null) {
+                    if (result.has("response")) textContent = result.get("response").getAsString();
+                    else if (result.has("text")) textContent = result.get("text").getAsString();
+                }
+                if (thoughtContent == null) {
+                    if (result.has("reasoning")) thoughtContent = result.get("reasoning").getAsString();
+                    else if (result.has("thought")) thoughtContent = result.get("thought").getAsString();
                 }
             }
 
-            if (responseJson.has("result")) {
-                JsonObject result = responseJson.getAsJsonObject("result");
-                if (result.has("text")) {
-                    String text = result.get("text").getAsString();
-                    if (text != null) {
-                        return text;
-                    }
-                }
+            if (textContent != null) {
+                return new AIResponse(textContent, thoughtContent);
             }
 
             throw new IOException("无法解析 AI 响应结果: " + responseBody);
