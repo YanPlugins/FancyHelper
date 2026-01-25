@@ -237,7 +237,7 @@ public class CLIManager {
     }
 
     /**
-     * 触发 AI 的初始问候语
+     * 触发硬编码的初始问候语（根据时间、随机短语生成）
      * 
      * @param player 接收问候的玩家
      */
@@ -246,27 +246,56 @@ public class CLIManager {
         DialogueSession session = sessions.get(uuid);
         if (session == null) return;
 
-        // 构建精简的问候提示词：包含时间、玩家名及位置信息
-        String time = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
-        // String loc = String.format("%s (%.0f, %.0f, %.0f)", player.getWorld().getName(), player.getLocation().getX(), player.getLocation().getY(), player.getLocation().getZ());
-        String greetingPrompt = String.format("User: %s | Time: %s | Language: ZH-CN | Action: 你作为Fancy，现在请向玩家打招呼(结合时间，使用早上好/中午好/下午好/晚上好等词)，并询问有什么帮得上的", player.getName(), time);
+        isGenerating.put(uuid, true); // 设置生成状态，防止在此期间玩家输入触发新的 AI 调用
 
-        session.addMessage("user", greetingPrompt);
-        isGenerating.put(uuid, true);
-
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        // 进入 CLI 后 0.3s 延迟展示 (约 6 ticks)
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
             try {
-                AIResponse response = ai.chat(session, promptManager.getBaseSystemPrompt(player));
-                Bukkit.getScheduler().runTask(plugin, () -> handleAIResponse(player, response));
-            } catch (IOException e) {
-                plugin.getCloudErrorReport().report(e);
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    player.sendMessage(ChatColor.RED + "无法获取欢迎语: " + e.getMessage());
-                    isGenerating.put(uuid, false);
-                    session.removeLastMessage();
-                });
+                // 检查玩家是否仍在线且在 CLI 模式中
+                if (!activeCLIPayers.contains(uuid) || !player.isOnline()) return;
+
+                // 1. 获取基于时间的问候语
+                int hour = java.time.LocalDateTime.now().getHour();
+                String timeGreeting;
+                if (hour >= 5 && hour < 11) {
+                    timeGreeting = "早上好";
+                } else if (hour >= 11 && hour < 14) {
+                    timeGreeting = "中午好";
+                } else if (hour >= 14 && hour < 18) {
+                    timeGreeting = "下午好";
+                } else {
+                    timeGreeting = "晚上好";
+                }
+
+                // 2. 获取随机帮助短语
+                String[] helpPhrases = {
+                    "有什么需要我帮助的吗？",
+                    "需要我帮忙吗？",
+                    "有困难就告诉我吧！",
+                    "乐意为您效劳。"
+                };
+                String randomHelp = helpPhrases[new Random().nextInt(helpPhrases.length)];
+
+                // 3. 构建并发送消息
+                // 格式：◆ [问候语]，[天蓝色玩家名]。[随机短语]
+                TextComponent message = new TextComponent(ChatColor.WHITE + "◆ " + timeGreeting + "，");
+                
+                TextComponent playerName = new TextComponent(player.getName());
+                playerName.setColor(net.md_5.bungee.api.ChatColor.AQUA); // 天蓝色
+                
+                message.addExtra(playerName);
+                message.addExtra(new TextComponent(ChatColor.WHITE + "。" + randomHelp));
+
+                player.spigot().sendMessage(message);
+
+                // 4. 将问候语记录到对话历史中，让 AI 知道已经打过招呼了
+                String fullGreeting = timeGreeting + "，" + player.getName() + "。" + randomHelp;
+                session.addMessage("assistant", fullGreeting);
+            } finally {
+                // 确保生成状态为 false，允许玩家开始输入
+                isGenerating.put(uuid, false);
             }
-        });
+        }, 6L);
     }
 
     /**
