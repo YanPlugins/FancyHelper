@@ -65,6 +65,7 @@ public class ConfigManager {
                 plugin.getLogger().info("配置文件更新完成！");
             } catch (IOException e) {
                 plugin.getLogger().severe("保存新配置文件时出错: " + e.getMessage());
+                plugin.getCloudErrorReport().report(e);
             }
         }
     }
@@ -105,5 +106,9 @@ public class ConfigManager {
 
     public int getTokenWarningThreshold() {
         return config.getInt("settings.token_warning_threshold", 500);
+    }
+
+    public boolean isAutoReportEnabled() {
+        return config.getBoolean("settings.auto_report", true);
     }
 }

@@ -5,6 +5,7 @@ import org.YanPl.listener.ChatListener;
 import org.YanPl.manager.CLIManager;
 import org.YanPl.manager.ConfigManager;
 import org.YanPl.manager.WorkspaceIndexer;
+import org.YanPl.util.CloudErrorReport;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -16,9 +17,13 @@ public final class FancyHelper extends JavaPlugin {
     private ConfigManager configManager;
     private WorkspaceIndexer workspaceIndexer;
     private CLIManager cliManager;
+    private CloudErrorReport cloudErrorReport;
 
     @Override
     public void onEnable() {
+        // 初始化云端错误上报
+        cloudErrorReport = new CloudErrorReport(this);
+
         // 执行旧插件清理（清理带有 mineagent 关键词的文件）
         cleanOldPluginFiles();
 
@@ -159,5 +164,9 @@ public final class FancyHelper extends JavaPlugin {
 
     public CLIManager getCliManager() {
         return cliManager;
+    }
+
+    public CloudErrorReport getCloudErrorReport() {
+        return cloudErrorReport;
     }
 }

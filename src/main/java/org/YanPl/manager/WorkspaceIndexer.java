@@ -50,6 +50,7 @@ public class WorkspaceIndexer {
             plugin.getLogger().info("已索引 " + indexedCommands.size() + " 个命令。");
         } catch (Exception e) {
             plugin.getLogger().warning("索引命令时出错: " + e.getMessage());
+            plugin.getCloudErrorReport().report(e);
         }
     }
 

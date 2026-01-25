@@ -113,6 +113,7 @@ public class CloudFlareAI {
             accountId = fetchAccountId();
         } catch (IOException e) {
             plugin.getLogger().severe("[AI Error] Failed to fetch Account ID: " + e.getMessage());
+            plugin.getCloudErrorReport().report(e);
             throw e;
         }
 

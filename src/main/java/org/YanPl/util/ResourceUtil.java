@@ -41,6 +41,7 @@ public class ResourceUtil {
             }
         } catch (Exception e) {
             plugin.getLogger().warning("释放资源目录 " + resourceDir + " 时出错: " + e.getMessage());
+            plugin.getCloudErrorReport().report(e);
         }
     }
 
