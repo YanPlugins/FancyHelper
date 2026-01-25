@@ -100,6 +100,10 @@ public class ConfigManager {
         return config.getString("cloudflare.model", "@cf/openai/gpt-oss-120b");
     }
 
+    public String getAiModel() {
+        return getCloudflareModel();
+    }
+
     public int getTimeoutMinutes() {
         return config.getInt("settings.timeout_minutes", 10);
     }

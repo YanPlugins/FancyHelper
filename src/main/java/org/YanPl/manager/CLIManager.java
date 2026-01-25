@@ -6,6 +6,7 @@ import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.hover.content.Text;
 import org.YanPl.FancyHelper;
 import org.YanPl.api.CloudFlareAI;
+import org.YanPl.model.AIResponse;
 import org.YanPl.model.DialogueSession;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -484,7 +485,7 @@ public class CLIManager {
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
-                String response = ai.chat(session, promptManager.getBaseSystemPrompt(player));
+                AIResponse response = ai.chat(session, promptManager.getBaseSystemPrompt(player));
                 Bukkit.getScheduler().runTask(plugin, () -> handleAIResponse(player, response));
             } catch (IOException e) {
                 plugin.getCloudErrorReport().report(e);
@@ -498,7 +499,7 @@ public class CLIManager {
         });
     }
 
-    private void handleAIResponse(Player player, String response) {
+    private void handleAIResponse(Player player, AIResponse aiResponse) {
         UUID uuid = player.getUniqueId();
         DialogueSession session = sessions.get(uuid);
         if (session == null) return;
@@ -509,25 +510,41 @@ public class CLIManager {
             return;
         }
 
+        String response = aiResponse.getContent();
+        String thoughtContent = aiResponse.getThought() != null ? aiResponse.getThought() : "";
+
         plugin.getLogger().info("[CLI] AI Response received for " + player.getName() + " (Length: " + response.length() + ")");
 
-        // 先将 AI 的回复加入历史记录，确保后续工具执行产生的反馈在回复之后
-        session.addMessage("assistant", response);
-
-        // 解析并移除思考内容，但计算其 Token
-        // 提取 <thought>...</thought> 内容
-        String thoughtContent = "";
+        // 如果 response 里面还有 <thought> 标签（API 可能没拆分出来），则继续尝试提取
         java.util.regex.Matcher thoughtMatcher = java.util.regex.Pattern.compile("(?s)<thought>(.*?)</thought>").matcher(response);
         if (thoughtMatcher.find()) {
-            thoughtContent = thoughtMatcher.group(1);
+            if (thoughtContent.isEmpty()) {
+                thoughtContent = thoughtMatcher.group(1);
+            }
+            response = response.replaceAll("(?s)<thought>.*?</thought>", "");
+        } else {
+            // 针对某些模型可能直接在正文中用 Markdown 块或特定标记显示思考过程
+            // 尝试匹配 ```thought ... ``` 块
+            java.util.regex.Matcher mdThoughtMatcher = java.util.regex.Pattern.compile("(?s)```thought\n?(.*?)\n?```").matcher(response);
+            if (mdThoughtMatcher.find()) {
+                if (thoughtContent.isEmpty()) {
+                    thoughtContent = mdThoughtMatcher.group(1);
+                }
+                response = response.replaceAll("(?s)```thought\n?.*?\n?```", "");
+            }
         }
         
-        // 移除 <thought>...</thought>
-        String cleanResponse = response.replaceAll("(?s)<thought>.*?</thought>", "");
         // 移除 Markdown 风格的 Thought: 块或类似文本
-        cleanResponse = cleanResponse.replaceAll("(?i)^Thought:.*?\n", "");
+        String cleanResponse = response.replaceAll("(?i)^Thought:.*?\n", "");
         cleanResponse = cleanResponse.replaceAll("(?i)^思考过程:.*?\n", "");
         cleanResponse = cleanResponse.trim();
+        
+        // 更新 session 中的最后一次思考内容
+        String finalThought = thoughtContent.isEmpty() ? null : thoughtContent;
+        session.setLastThought(finalThought);
+
+        // 将 AI 的回复加入历史记录，并关联当前的思考内容
+        session.addMessage("assistant", cleanResponse, finalThought);
         
         // 计算思考内容的 Token
         if (!thoughtContent.isEmpty()) {
@@ -1049,7 +1066,7 @@ public class CLIManager {
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
                     String systemPrompt = promptManager.getBaseSystemPrompt(player);
-                    String response = ai.chat(session, systemPrompt);
+                    AIResponse response = ai.chat(session, systemPrompt);
 
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     handleAIResponse(player, response);
@@ -1064,7 +1081,33 @@ public class CLIManager {
     }
 
     private void displayFancyContent(Player player, String content) {
-        // 先处理代码块 ```...```
+        // 获取当前 session 以获取思考内容
+        DialogueSession session = sessions.get(player.getUniqueId());
+        
+        // 如果有思考过程，显示按钮
+        if (session != null) {
+            List<DialogueSession.Message> history = session.getHistory();
+            if (!history.isEmpty()) {
+                // 查找最后一条 assistant 消息的索引（即当前回复）
+                int lastAssistantIdx = -1;
+                for (int i = history.size() - 1; i >= 0; i--) {
+                    if ("assistant".equalsIgnoreCase(history.get(i).getRole())) {
+                        lastAssistantIdx = i;
+                        break;
+                    }
+                }
+                
+                if (lastAssistantIdx != -1 && history.get(lastAssistantIdx).hasThought()) {
+                    TextComponent thoughtBtn = new TextComponent(ChatColor.GRAY + " ※ Thought");
+                    // 传递索引以便查看特定思考
+                    thoughtBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli thought " + lastAssistantIdx));
+                    thoughtBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击查看本次思考过程")));
+                    player.spigot().sendMessage(thoughtBtn);
+                }
+            }
+        }
+
+        // 处理代码块 ```...```
         String[] codeParts = content.split("```");
         TextComponent finalMessage = new TextComponent(ChatColor.WHITE + "◆ ");
         
@@ -1089,6 +1132,61 @@ public class CLIManager {
             }
         }
         player.spigot().sendMessage(finalMessage);
+    }
+
+    /**
+     * 展示特定索引或最新的思考过程
+     */
+    public void handleThought(Player player, String[] args) {
+        DialogueSession session = sessions.get(player.getUniqueId());
+        if (session == null) {
+            player.sendMessage(ChatColor.RED + "当前没有活动的对话。");
+            return;
+        }
+
+        String thought = null;
+        if (args.length > 0) {
+            try {
+                int index = Integer.parseInt(args[0]);
+                List<DialogueSession.Message> history = session.getHistory();
+                if (index >= 0 && index < history.size()) {
+                    thought = history.get(index).getThought();
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+
+        // 如果没有提供索引或索引无效，则回退到最后一次思考
+        if (thought == null) {
+            thought = session.getLastThought();
+        }
+
+        if (thought == null) {
+            player.sendMessage(ChatColor.RED + "找不到对应的思考过程。");
+            return;
+        }
+
+        // 创建书本
+        org.bukkit.inventory.ItemStack book = new org.bukkit.inventory.ItemStack(org.bukkit.Material.WRITTEN_BOOK);
+        org.bukkit.inventory.meta.BookMeta meta = (org.bukkit.inventory.meta.BookMeta) book.getItemMeta();
+        
+        if (meta != null) {
+            meta.setTitle("Fancy Thought");
+            meta.setAuthor("Fancy");
+            
+            // 分页处理（书本每页约 256 字符，但实际受行数限制，简单按字符分段）
+            List<String> pages = new ArrayList<>();
+            int pageSize = 250;
+            for (int i = 0; i < thought.length(); i += pageSize) {
+                pages.add(thought.substring(i, Math.min(i + pageSize, thought.length())));
+            }
+            
+            if (pages.isEmpty()) pages.add("");
+            meta.setPages(pages);
+            book.setItemMeta(meta);
+            
+            // 打开书本
+            player.openBook(book);
+        }
     }
 
     private void sendAgreement(Player player) {

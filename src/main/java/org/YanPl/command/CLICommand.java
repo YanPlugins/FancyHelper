@@ -71,6 +71,9 @@ public class CLICommand implements CommandExecutor, TabCompleter {
             case "agree":
                 plugin.getCliManager().handleChat(player, "agree");
                 return true;
+            case "thought":
+                plugin.getCliManager().handleThought(player, Arrays.copyOfRange(args, 1, args.length));
+                return true;
             case "error":
                 if (!player.isOp()) {
                     player.sendMessage(ChatColor.RED + "该测试命令仅限管理员使用。");
@@ -110,8 +113,16 @@ public class CLICommand implements CommandExecutor, TabCompleter {
             } else if (target.equals("config")) {
                 plugin.getConfigManager().loadConfig();
                 player.sendMessage(ChatColor.GREEN + "配置文件已重新加载。");
+            } else if (target.equals("deeply")) {
+                player.sendMessage(ChatColor.YELLOW + "正在深度重载插件...");
+                org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                    org.bukkit.plugin.PluginManager pm = org.bukkit.Bukkit.getPluginManager();
+                    pm.disablePlugin(plugin);
+                    pm.enablePlugin(plugin);
+                    player.sendMessage(ChatColor.GREEN + "插件已深度重载（已完成卸载与重新加载）。");
+                });
             } else {
-                player.sendMessage(ChatColor.RED + "用法: /fancy reload [workspace|config]");
+                player.sendMessage(ChatColor.RED + "用法: /fancy reload [workspace|config|deeply]");
             }
         }
     }
@@ -138,11 +149,11 @@ public class CLICommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return Arrays.asList("reload", "status").stream()
+            return Arrays.asList("reload", "status", "thought").stream()
                     .filter(s -> s.startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());
         } else if (args.length == 2 && args[0].equalsIgnoreCase("reload")) {
-            return Arrays.asList("workspace", "config").stream()
+            return Arrays.asList("workspace", "config", "deeply").stream()
                     .filter(s -> s.startsWith(args[1].toLowerCase()))
                     .collect(Collectors.toList());
         }
