@@ -53,6 +53,7 @@ public class CLIManager {
             }
         } catch (IOException e) {
             plugin.getLogger().warning("无法加载已同意协议的玩家列表: " + e.getMessage());
+            plugin.getCloudErrorReport().report(e);
         }
     }
 
@@ -65,6 +66,7 @@ public class CLIManager {
                 java.nio.file.StandardOpenOption.APPEND);
         } catch (IOException e) {
             plugin.getLogger().warning("无法保存已同意协议的玩家: " + e.getMessage());
+            plugin.getCloudErrorReport().report(e);
         }
     }
 
@@ -174,6 +176,7 @@ public class CLIManager {
                 String response = ai.chat(session, promptManager.getBaseSystemPrompt(player));
                 Bukkit.getScheduler().runTask(plugin, () -> handleAIResponse(player, response));
             } catch (IOException e) {
+                plugin.getCloudErrorReport().report(e);
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     player.sendMessage(ChatColor.RED + "无法获取欢迎语: " + e.getMessage());
                     isGenerating.put(uuid, false);
@@ -314,6 +317,7 @@ public class CLIManager {
                 String response = ai.chat(session, promptManager.getBaseSystemPrompt(player));
                 Bukkit.getScheduler().runTask(plugin, () -> handleAIResponse(player, response));
             } catch (IOException e) {
+                plugin.getCloudErrorReport().report(e);
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     player.sendMessage(ChatColor.RED + "AI 调用出错: " + e.getMessage());
                     isGenerating.put(uuid, false);

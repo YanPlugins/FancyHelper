@@ -12,5 +12,6 @@ search:
 
 # Plugin Settings
 settings:
-  timeout_minutes: 10
-  token_warning_threshold: 500
+  timeout_minutes: 10  #设置 CLI 模式会话的自动过期时间 （以分钟为单位）
+  token_warning_threshold: 12800  #设置 Token（字符数）剩余警告阈值
+  auto_report: true  # 是否启用匿名错误上报，帮助开发者改进插件
