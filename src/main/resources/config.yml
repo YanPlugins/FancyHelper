@@ -6,10 +6,6 @@ cloudflare:
   cf_key: "maF_cBg4UXnWgTaE8t8tdAq-iGZ5osv6CHxm2nH0"
   model: "@cf/openai/gpt-oss-120b"
 
-# Search Configuration
-search:
-  # 使用公开搜索接口，无需配置 Key
-
 # Plugin Settings
 settings:
   timeout_minutes: 10  #设置 CLI 模式会话的自动过期时间 （以分钟为单位）

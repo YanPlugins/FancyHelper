@@ -21,6 +21,7 @@ public class DialogueSession {
     private int toolFailureCount = 0;
     private int thoughtTokens = 0;
     private Mode mode = Mode.NORMAL;
+    private String lastThought = null;
 
     public DialogueSession() {
         this.lastActivityTime = System.currentTimeMillis();
@@ -28,8 +29,12 @@ public class DialogueSession {
     }
 
     public void addMessage(String role, String content) {
+        addMessage(role, content, null);
+    }
+
+    public void addMessage(String role, String content, String thought) {
         // 添加消息并更新活动时间；限制历史长度以节省 token
-        history.add(new Message(role, content));
+        history.add(new Message(role, content, thought));
         this.lastActivityTime = System.currentTimeMillis();
         
         if (history.size() > 20) {
@@ -106,13 +111,27 @@ public class DialogueSession {
         this.mode = mode;
     }
 
+    public String getLastThought() {
+        return lastThought;
+    }
+
+    public void setLastThought(String lastThought) {
+        this.lastThought = lastThought;
+    }
+
     public static class Message {
         private final String role;
         private final String content;
+        private final String thought;
 
         public Message(String role, String content) {
+            this(role, content, null);
+        }
+
+        public Message(String role, String content, String thought) {
             this.role = role != null ? role : "user";
             this.content = content != null ? content : "";
+            this.thought = thought;
         }
 
         public String getRole() {
@@ -121,6 +140,14 @@ public class DialogueSession {
 
         public String getContent() {
             return content;
+        }
+
+        public String getThought() {
+            return thought;
+        }
+
+        public boolean hasThought() {
+            return thought != null && !thought.isEmpty();
         }
     }
 }
