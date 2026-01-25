@@ -18,7 +18,7 @@ public class CloudFlareAI {
      * 简单封装 CloudFlare AI HTTP 调用的客户端
      * 负责构建请求、解析响应，以及管理 HttpClient 的生命周期。
      */
-    private static final String API_RESPONSES_URL = "https://api.cloudflare.com/client/v4/accounts/%s/ai/v1/responses";
+    private static final String API_COMPLETIONS_URL = "https://api.cloudflare.com/client/v4/accounts/%s/ai/v1/chat/completions";
     private static final String ACCOUNTS_URL = "https://api.cloudflare.com/client/v4/accounts";
     private final FancyHelper plugin;
     private final OkHttpClient httpClient;
@@ -118,7 +118,7 @@ public class CloudFlareAI {
             throw e;
         }
 
-        String url = String.format(API_RESPONSES_URL, accountId);
+        String url = String.format(API_COMPLETIONS_URL, accountId);
         plugin.getLogger().info("[AI Request] URL: " + url);
 
         JsonArray messagesArray = new JsonArray();
@@ -196,12 +196,16 @@ public class CloudFlareAI {
 
         JsonObject bodyJson = new JsonObject();
         bodyJson.addProperty("model", model);
-        bodyJson.add("input", messagesArray);
+        // 根据用户要求，gpt 系列必须使用 completions 接口并使用 messages 字段
+        bodyJson.add("messages", messagesArray);
         
         if (model.contains("gpt-oss")) {
-            JsonObject reasoning = new JsonObject();
-            reasoning.addProperty("effort", "medium");
-            bodyJson.add("reasoning", reasoning);
+            // 根据 OpenAI 规范，对于推理模型（如 o1/gpt-oss），在 chat/completions 接口中
+            // 应当使用 reasoning_effort 字段（字符串），而不是 Cloudflare 原生的 reasoning 对象
+            bodyJson.addProperty("reasoning_effort", "medium");
+            
+            // 确保有足够的 token 输出思考过程
+            bodyJson.addProperty("max_tokens", 4096);
         }
         
         String bodyString = gson.toJson(bodyJson);
@@ -239,8 +243,9 @@ public class CloudFlareAI {
             if (!response.isSuccessful()) {
                 plugin.getLogger().warning("[AI Error] Response Body: " + responseBody);
 
-                if (response.code() == 400 && responseBody != null && responseBody.contains("startswith")) {
-                    plugin.getLogger().warning("[AI] Detected startswith NoneType error from CF API, retrying with simplified payload...");
+                // 如果是 400 (常见于 payload 错误) 或 500 (常见于推理模型参数不兼容)，尝试使用最简 payload 重试
+                if ((response.code() == 400 || response.code() == 500) && responseBody != null) {
+                    plugin.getLogger().warning("[AI] Detected error " + response.code() + " from CF API, retrying with simplified payload...");
 
                     JsonArray simpleInput = new JsonArray();
                     JsonObject simpleSystem = new JsonObject();
@@ -266,7 +271,7 @@ public class CloudFlareAI {
 
                     JsonObject simpleBody = new JsonObject();
                     simpleBody.addProperty("model", model);
-                    simpleBody.add("input", simpleInput);
+                    simpleBody.add("messages", simpleInput);
 
                     String simpleBodyString = gson.toJson(simpleBody);
                     plugin.getLogger().info("[AI Request] Retrying with simplified payload: " + simpleBodyString);
@@ -290,7 +295,25 @@ public class CloudFlareAI {
                         String textC = null;
                         String thoughtC = null;
 
-                        if (responseJson.has("output") && responseJson.get("output").isJsonArray()) {
+                        // 1. 尝试解析 OpenAI 兼容格式
+                        if (responseJson.has("choices") && responseJson.get("choices").isJsonArray()) {
+                            JsonArray choices = responseJson.getAsJsonArray("choices");
+                            if (choices.size() > 0) {
+                                JsonObject choice = choices.get(0).getAsJsonObject();
+                                if (choice.has("message")) {
+                                    JsonObject message = choice.getAsJsonObject("message");
+                                    if (message.has("content") && !message.get("content").isJsonNull()) {
+                                        textC = message.get("content").getAsString();
+                                    }
+                                    if (message.has("reasoning_content") && !message.get("reasoning_content").isJsonNull()) {
+                                        thoughtC = message.get("reasoning_content").getAsString();
+                                    }
+                                }
+                            }
+                        }
+
+                        // 2. 尝试解析 Cloudflare 原生 output 格式
+                        if (textC == null && responseJson.has("output") && responseJson.get("output").isJsonArray()) {
                             JsonArray outputArray = responseJson.getAsJsonArray("output");
                             for (int i = 0; i < outputArray.size(); i++) {
                                 JsonObject item = outputArray.get(i).getAsJsonObject();
@@ -311,12 +334,12 @@ public class CloudFlareAI {
                             }
                         }
 
-                        if (responseJson.has("result")) {
+                        // 3. 尝试解析 Cloudflare 原生 result 格式
+                        if (textC == null && responseJson.has("result")) {
                             JsonObject result = responseJson.getAsJsonObject("result");
-                            if (textC == null) {
-                                if (result.has("response")) textC = result.get("response").isJsonNull() ? null : result.get("response").getAsString();
-                                else if (result.has("text")) textC = result.get("text").isJsonNull() ? null : result.get("text").getAsString();
-                            }
+                            if (result.has("response")) textC = result.get("response").isJsonNull() ? null : result.get("response").getAsString();
+                            else if (result.has("text")) textC = result.get("text").isJsonNull() ? null : result.get("text").getAsString();
+                            
                             if (thoughtC == null) {
                                 if (result.has("reasoning")) thoughtC = result.get("reasoning").isJsonNull() ? null : result.get("reasoning").getAsString();
                                 else if (result.has("thought")) thoughtC = result.get("thought").isJsonNull() ? null : result.get("thought").getAsString();
@@ -337,7 +360,26 @@ public class CloudFlareAI {
             String textContent = null;
             String thoughtContent = null;
 
-            if (responseJson.has("output") && responseJson.get("output").isJsonArray()) {
+            // 1. 尝试解析 OpenAI 兼容格式 (choices 数组)
+            if (responseJson.has("choices") && responseJson.get("choices").isJsonArray()) {
+                JsonArray choices = responseJson.getAsJsonArray("choices");
+                if (choices.size() > 0) {
+                    JsonObject choice = choices.get(0).getAsJsonObject();
+                    if (choice.has("message")) {
+                        JsonObject message = choice.getAsJsonObject("message");
+                        if (message.has("content") && !message.get("content").isJsonNull()) {
+                            textContent = message.get("content").getAsString();
+                        }
+                        // 某些模型在 reasoning_content 中返回思考过程
+                        if (message.has("reasoning_content") && !message.get("reasoning_content").isJsonNull()) {
+                            thoughtContent = message.get("reasoning_content").getAsString();
+                        }
+                    }
+                }
+            }
+
+            // 2. 尝试解析 Cloudflare 原生 output 格式
+            if (textContent == null && responseJson.has("output") && responseJson.get("output").isJsonArray()) {
                 JsonArray outputArray = responseJson.getAsJsonArray("output");
                 for (int i = 0; i < outputArray.size(); i++) {
                     JsonObject item = outputArray.get(i).getAsJsonObject();
@@ -358,12 +400,12 @@ public class CloudFlareAI {
                 }
             }
 
-            if (responseJson.has("result")) {
+            // 3. 尝试解析 Cloudflare 原生 result 格式
+            if (textContent == null && responseJson.has("result")) {
                 JsonObject result = responseJson.getAsJsonObject("result");
-                if (textContent == null) {
-                    if (result.has("response")) textContent = result.get("response").getAsString();
-                    else if (result.has("text")) textContent = result.get("text").getAsString();
-                }
+                if (result.has("response")) textContent = result.get("response").getAsString();
+                else if (result.has("text")) textContent = result.get("text").getAsString();
+                
                 if (thoughtContent == null) {
                     if (result.has("reasoning")) thoughtContent = result.get("reasoning").getAsString();
                     else if (result.has("thought")) thoughtContent = result.get("thought").getAsString();
@@ -371,6 +413,13 @@ public class CloudFlareAI {
             }
 
             if (textContent != null) {
+                // 如果思考内容为空，但在正文中包含 <thought> 标签，我们不在这里处理，交给 CLIManager 处理
+                // 但为了确保按钮能显示，我们记录一下日志
+                if (thoughtContent != null) {
+                    plugin.getLogger().info("[AI] Detected thought content in API field (length: " + thoughtContent.length() + ")");
+                } else if (textContent.contains("<thought>")) {
+                    plugin.getLogger().info("[AI] Detected thought tags inside text content");
+                }
                 return new AIResponse(textContent, thoughtContent);
             }
 
