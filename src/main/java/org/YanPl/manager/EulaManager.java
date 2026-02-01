@@ -223,8 +223,8 @@ public class EulaManager {
             meta.setTitle("FancyHelper EULA");
             meta.setAuthor("FancyHelper");
             
-            // 按字符数分页，Minecraft 书本每页约 256 字符限制，使用 230 作为安全边距
-            final int MAX_PAGE_CHARS = 230;
+            // 按字符数分页，Minecraft 书本每页约 256 字符限制，使用 128 作为安全边距
+            final int MAX_PAGE_CHARS = 128;
             StringBuilder pageBuilder = new StringBuilder();
             
             for (String line : eulaContent) {
