@@ -79,7 +79,7 @@ public class EulaManager {
             "",
             "6. 【协议变更】",
             "   开发者保留随时修改本协议的权利。协议一经修改即刻生效。",
-            "=================================================="
+            "================="
         );
 
         this.licenseContent = Arrays.asList(
@@ -223,19 +223,33 @@ public class EulaManager {
             meta.setTitle("FancyHelper EULA");
             meta.setAuthor("FancyHelper");
             
-            // 将内容分页
+            // 按字符数分页，Minecraft 书本每页约 256 字符限制，使用 128 作为安全边距
+            final int MAX_PAGE_CHARS = 128;
             StringBuilder pageBuilder = new StringBuilder();
-            int lineCount = 0;
+            
             for (String line : eulaContent) {
-                pageBuilder.append(line).append("\n");
-                lineCount++;
+                String lineWithNewline = line + "\n";
                 
-                // 大约每 13 行一页，或者根据实际内容长度调整
-                if (lineCount >= 13) {
+                // 如果当前行加入后会超出页面限制，先添加当前页面
+                if (pageBuilder.length() + lineWithNewline.length() > MAX_PAGE_CHARS) {
+                    if (pageBuilder.length() > 0) {
+                        meta.addPage(pageBuilder.toString());
+                        pageBuilder = new StringBuilder();
+                    }
+                }
+                
+                // 如果单行就超过页面限制，需要智能换行
+                String remainingLine = lineWithNewline;
+                while (remainingLine.length() > MAX_PAGE_CHARS) {
+                    int splitIndex = findSmartSplitIndex(remainingLine, MAX_PAGE_CHARS);
+                    pageBuilder.append(remainingLine, 0, splitIndex).append("\n");
                     meta.addPage(pageBuilder.toString());
                     pageBuilder = new StringBuilder();
-                    lineCount = 0;
+                    remainingLine = remainingLine.substring(splitIndex).trim();
+                    if (remainingLine.isEmpty()) break;
                 }
+                
+                pageBuilder.append(remainingLine);
             }
             
             // 添加最后一页
@@ -247,6 +261,33 @@ public class EulaManager {
         }
         
         return book;
+    }
+    
+    /**
+     * 智能换行：按空格或中文字符边界分割
+     * 
+     * @param text 要分割的文本
+     * @param maxLen 最大长度
+     * @return 建议的分割位置
+     */
+    private int findSmartSplitIndex(String text, int maxLen) {
+        if (text.length() <= maxLen) return text.length();
+        
+        // 先尝试在空格处分割
+        int lastSpace = text.lastIndexOf(' ', maxLen);
+        if (lastSpace > maxLen / 2) {
+            return lastSpace;
+        }
+        
+        // 中文字符边界检查（中文在 Unicode 中位于 4E00-9FA5 范围）
+        for (int i = maxLen - 1; i >= maxLen / 2; i--) {
+            char c = text.charAt(i);
+            if (c < 0x4E00 || c > 0x9FA5) { // 非中文字符
+                return i + 1;
+            }
+        }
+        
+        return maxLen;
     }
 
     /**
