@@ -5,7 +5,6 @@ import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.hover.content.Text;
 import org.YanPl.FancyHelper;
-import org.YanPl.manager.VerificationManager;
 import org.YanPl.api.CloudFlareAI;
 import org.YanPl.model.AIResponse;
 import org.YanPl.model.DialogueSession;
