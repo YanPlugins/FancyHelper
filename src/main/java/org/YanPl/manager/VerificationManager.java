@@ -20,6 +20,7 @@ public class VerificationManager {
     private final FancyHelper plugin;
     private final File verifyDir;
     private final Map<UUID, VerificationSession> activeSessions = new HashMap<>();
+    private final Map<UUID, Long> frozenPlayers = new HashMap<>(); // 冻结的玩家及解冻时间
 
     public VerificationManager(FancyHelper plugin) {
         this.plugin = plugin;
@@ -91,6 +92,19 @@ public class VerificationManager {
      */
     public boolean handleVerification(Player player, String message) {
         UUID uuid = player.getUniqueId();
+        
+        // 检查是否被冻结
+        if (frozenPlayers.containsKey(uuid)) {
+            long unfreezeTime = frozenPlayers.get(uuid);
+            if (System.currentTimeMillis() < unfreezeTime) {
+                long remainingSeconds = (unfreezeTime - System.currentTimeMillis()) / 1000;
+                player.sendMessage(ChatColor.RED + "验证已冻结，请在 " + remainingSeconds + " 秒后重试。");
+                return true;
+            } else {
+                frozenPlayers.remove(uuid);
+            }
+        }
+        
         if (!activeSessions.containsKey(uuid)) return false;
 
         VerificationSession session = activeSessions.get(uuid);
@@ -131,8 +145,11 @@ public class VerificationManager {
             if (session.attempts >= 3) {
                 activeSessions.remove(uuid);
                 new File(verifyDir, player.getName() + "-" + session.type + ".txt").delete();
-                player.sendMessage(ChatColor.RED + "尝试次数过多，验证已取消。请在一分钟后重试。");
-                // 冷却逻辑可以在此处通过另一个 Map 实现，这里简单处理
+                
+                // 冻结玩家 1 分钟
+                frozenPlayers.put(uuid, System.currentTimeMillis() + 60 * 1000);
+                
+                player.sendMessage(ChatColor.RED + "尝试次数过多，验证已取消。已冻结 1 分钟，请在 60 秒后重试。");
             } else {
                 if (session.type.equals("read") || session.type.equals("ls")) {
                     player.sendMessage(ChatColor.RED + "密码错误，请重试（剩余次数: " + (3 - session.attempts) + "）");
