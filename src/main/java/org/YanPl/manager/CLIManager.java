@@ -1362,9 +1362,9 @@ public class CLIManager {
             meta.setTitle("Fancy Thought");
             meta.setAuthor("Fancy");
             
-            // 分页处理（书本每页约 256 字符，但实际受行数限制，简单按字符分段）
+            // 分页处理（书本每页约 256 字符，但实际受行数限制，使用 128 作为安全边距）
             List<String> pages = new ArrayList<>();
-            int pageSize = 250;
+            int pageSize = 128;
             for (int i = 0; i < thought.length(); i += pageSize) {
                 pages.add(thought.substring(i, Math.min(i + pageSize, thought.length())));
             }
