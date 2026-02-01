@@ -42,6 +42,15 @@ public class PromptManager {
         sb.append("   #choose: <A>,<B>,<C>... - 展示多个选项供用户选择，A、B、C等可以被替换成任意内容。如果用户的表述有多种实现途径，使用此工具让用户进行选择而不是直接询问。\n");
         sb.append("   #get: <file> - 从预设目录获取文件内容。\n");
         sb.append("   #run: <command> - 以玩家身份执行命令。注意：只能有一个命令，并且命令参数不要带斜杠 /。例如 #run: give @p apple \n");
+        
+        if (plugin.getConfigManager().isPlayerToolEnabled(player, "ls")) {
+            sb.append("   #ls: <path> - 列出指定目录下的文件和文件夹，注意此工具调用结果玩家看不见。路径在服务器目录内。如#ls: plugins/FancyHelper\n");
+        }
+        if (plugin.getConfigManager().isPlayerToolEnabled(player, "read")) {
+            sb.append("   #read: <path> - 读取指定文件的内容。路径在服务器目录内，此工具调用结果玩家看不见。如#read: plugins/FancyHelper/config.yml\n");
+        }
+
+
         sb.append("   #over - 完成任务，停止本轮输出。\n");
         sb.append("   #exit - 当用户想退出FancyHelper，比如向你道别时调用。\n");
         sb.append("   **注意：每轮回复只能包含一个工具调用。工具名和冒号之间不要有空格。执行命令时绝对不要带斜杠 /。**\n");
