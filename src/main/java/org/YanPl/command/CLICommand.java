@@ -172,8 +172,23 @@ public class CLICommand implements CommandExecutor, TabCompleter {
                 org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
                     org.bukkit.plugin.PluginManager pm = org.bukkit.Bukkit.getPluginManager();
                     pm.disablePlugin(plugin);
-                    pm.enablePlugin(plugin);
-                    player.sendMessage(ChatColor.GREEN + "插件已深度重载（已完成卸载与重新加载）。");
+                    // 深度重载：重新加载所有插件（模拟服务器重新扫描 plugins 目录）
+                    // 实际上 pm.enablePlugin(plugin) 只是重新启用已加载的插件实例
+                    // 如果需要从 plugins 目录下的文件重新加载，我们需要清理已加载的信息
+                    try {
+                        // 尝试从磁盘重新加载插件文件
+                        java.io.File pluginFile = new java.io.File(plugin.getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
+                        pm.loadPlugin(pluginFile);
+                        org.bukkit.plugin.Plugin newPlugin = pm.getPlugin("FancyHelper");
+                        if (newPlugin != null) {
+                            pm.enablePlugin(newPlugin);
+                        }
+                        player.sendMessage(ChatColor.GREEN + "插件已深度重载（已从磁盘重新加载插件文件）。");
+                    } catch (Exception e) {
+                        plugin.getLogger().severe("深度重载失败: " + e.getMessage());
+                        pm.enablePlugin(plugin); // 失败时尝试恢复原插件
+                        player.sendMessage(ChatColor.RED + "深度重载失败: " + e.getMessage());
+                    }
                 });
             } else {
                 player.sendMessage(ChatColor.RED + "用法: /fancy reload [workspace|config|deeply]");
