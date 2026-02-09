@@ -90,7 +90,7 @@ public class CLICommand implements CommandExecutor, TabCompleter {
                     player.sendMessage(ChatColor.RED + "你没有权限执行更新。");
                     return true;
                 }
-                plugin.getUpdateManager().downloadAndInstall(player);
+                plugin.getUpdateManager().downloadAndInstall(player, true);
                 break;
             case "yolo":
                 plugin.getCliManager().switchMode(player, DialogueSession.Mode.YOLO);
