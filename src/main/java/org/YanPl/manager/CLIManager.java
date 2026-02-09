@@ -901,7 +901,7 @@ public class CLIManager {
                             } else {
                                 String newContent = content.replace(search, replace);
                                 java.nio.file.Files.write(file.toPath(), newContent.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                                result = "成功修改文件: " + path;
+                                result = "成功修改文件: " + path + "\n修改内容摘要：\n- 查找: " + (search.length() > 50 ? search.substring(0, 50) + "..." : search) + "\n- 替换为: " + (replace.length() > 50 ? replace.substring(0, 50) + "..." : replace);
                             }
                         }
                     }
