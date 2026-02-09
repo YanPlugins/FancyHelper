@@ -168,26 +168,39 @@ public class CLICommand implements CommandExecutor, TabCompleter {
                 plugin.getEulaManager().reload();
                 player.sendMessage(ChatColor.GREEN + "EULA 文件已重新加载。");
             } else if (target.equals("deeply")) {
-                player.sendMessage(ChatColor.YELLOW + "正在深度重载插件...");
+                player.sendMessage(ChatColor.YELLOW + "正在尝试深度重载插件...");
                 org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
                     org.bukkit.plugin.PluginManager pm = org.bukkit.Bukkit.getPluginManager();
+                    String pluginName = plugin.getName();
+                    
+                    // 1. 禁用插件
                     pm.disablePlugin(plugin);
-                    // 深度重载：重新加载所有插件（模拟服务器重新扫描 plugins 目录）
-                    // 实际上 pm.enablePlugin(plugin) 只是重新启用已加载的插件实例
-                    // 如果需要从 plugins 目录下的文件重新加载，我们需要清理已加载的信息
+                    
                     try {
-                        // 尝试从磁盘重新加载插件文件
+                        // 2. 使用反射从 PluginManager 中移除插件，防止 "duplicate plugin identifier" 错误
+                        // 兼容多种服务端实现（CraftBukkit, Spigot, Paper）
+                        unloadPluginFromManager(pm, plugin);
+                        
+                        // 3. 尝试从磁盘重新加载
                         java.io.File pluginFile = new java.io.File(plugin.getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
-                        pm.loadPlugin(pluginFile);
-                        org.bukkit.plugin.Plugin newPlugin = pm.getPlugin("FancyHelper");
+                        org.bukkit.plugin.Plugin newPlugin = pm.loadPlugin(pluginFile);
+                        
                         if (newPlugin != null) {
                             pm.enablePlugin(newPlugin);
+                            player.sendMessage(ChatColor.GREEN + "插件已深度重载（已替换 JAR 并重新加载）。");
+                        } else {
+                            throw new Exception("加载器返回 null，可能 JAR 文件无效。");
                         }
-                        player.sendMessage(ChatColor.GREEN + "插件已深度重载（已从磁盘重新加载插件文件）。");
                     } catch (Exception e) {
                         plugin.getLogger().severe("深度重载失败: " + e.getMessage());
-                        pm.enablePlugin(plugin); // 失败时尝试恢复原插件
-                        player.sendMessage(ChatColor.RED + "深度重载失败: " + e.getMessage());
+                        e.printStackTrace();
+                        // 尝试恢复原插件（如果它还没被完全破坏）
+                        try {
+                            pm.enablePlugin(plugin);
+                            player.sendMessage(ChatColor.RED + "深度重载失败，已尝试恢复原插件: " + e.getMessage());
+                        } catch (Exception ex) {
+                            player.sendMessage(ChatColor.DARK_RED + "深度重载严重失败，且无法恢复原插件！请手动重启服务器。");
+                        }
                     }
                 });
             } else {
@@ -252,5 +265,93 @@ public class CLICommand implements CommandExecutor, TabCompleter {
                     .collect(Collectors.toList());
         }
         return new ArrayList<>();
+    }
+
+    /**
+     * 尝试从插件管理器中彻底移除插件实例及相关引用。
+     * 这是一个危险操作，主要用于实现深度重载。
+     */
+    @SuppressWarnings("unchecked")
+    private void unloadPluginFromManager(org.bukkit.plugin.PluginManager pm, org.bukkit.plugin.Plugin plugin) {
+        try {
+            // 1. 从 SimplePluginManager 的 plugins 和 lookupNames 中移除
+            removePluginFromFields(pm, plugin);
+
+            // 2. 如果是 Paper，尝试处理其内部的 Provider 存储
+            try {
+                if (pm.getClass().getName().contains("PaperPluginManagerImpl")) {
+                    // Paper 1.21.4+ 的处理逻辑比较复杂，通常涉及 PaperPluginManagerImpl -> instance -> storage
+                    // 我们尝试寻找并清理可能存在的缓存
+                    java.lang.reflect.Field instanceField = pm.getClass().getDeclaredField("instance");
+                    instanceField.setAccessible(true);
+                    Object instance = instanceField.get(null);
+                    if (instance != null) {
+                        // 尝试在 instance 中寻找 storage 并清理
+                        removePluginFromFields(instance, plugin);
+                    }
+                }
+            } catch (Exception ignored) {}
+
+            // 3. 从 CommandMap 中注销属于该插件的命令
+            try {
+                java.lang.reflect.Field commandMapField = findField(pm.getClass(), "commandMap");
+                if (commandMapField != null) {
+                    commandMapField.setAccessible(true);
+                    org.bukkit.command.SimpleCommandMap commandMap = (org.bukkit.command.SimpleCommandMap) commandMapField.get(pm);
+                    java.lang.reflect.Field knownCommandsField = org.bukkit.command.SimpleCommandMap.class.getDeclaredField("knownCommands");
+                    knownCommandsField.setAccessible(true);
+                    java.util.Map<String, org.bukkit.command.Command> knownCommands = (java.util.Map<String, org.bukkit.command.Command>) knownCommandsField.get(commandMap);
+                    
+                    knownCommands.entrySet().removeIf(entry -> {
+                        org.bukkit.command.Command cmd = entry.getValue();
+                        if (cmd instanceof org.bukkit.command.PluginCommand) {
+                            return ((org.bukkit.command.PluginCommand) cmd).getPlugin().equals(plugin);
+                        }
+                        // 处理 Paper 的包装命令
+                        return cmd.getName().equalsIgnoreCase(plugin.getName()) || cmd.getName().startsWith(plugin.getName().toLowerCase() + ":");
+                    });
+                }
+            } catch (Exception ignored) {}
+            
+        } catch (Exception e) {
+            plugin.getLogger().warning("清理插件引用时出错: " + e.getMessage());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void removePluginFromFields(Object manager, org.bukkit.plugin.Plugin plugin) {
+        if (manager == null) return;
+        try {
+            java.lang.reflect.Field pluginsField = findField(manager.getClass(), "plugins");
+            if (pluginsField != null) {
+                pluginsField.setAccessible(true);
+                Object pluginsObj = pluginsField.get(manager);
+                if (pluginsObj instanceof java.util.List) {
+                    ((java.util.List<org.bukkit.plugin.Plugin>) pluginsObj).remove(plugin);
+                }
+            }
+
+            java.lang.reflect.Field lookupNamesField = findField(manager.getClass(), "lookupNames");
+            if (lookupNamesField != null) {
+                lookupNamesField.setAccessible(true);
+                Object lookupNamesObj = lookupNamesField.get(manager);
+                if (lookupNamesObj instanceof java.util.Map) {
+                    java.util.Map<String, org.bukkit.plugin.Plugin> lookupNames = (java.util.Map<String, org.bukkit.plugin.Plugin>) lookupNamesObj;
+                    lookupNames.remove(plugin.getName().toLowerCase());
+                    lookupNames.remove(plugin.getName());
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private java.lang.reflect.Field findField(Class<?> clazz, String name) {
+        while (clazz != null) {
+            try {
+                return clazz.getDeclaredField(name);
+            } catch (NoSuchFieldException e) {
+                clazz = clazz.getSuperclass();
+            }
+        }
+        return null;
     }
 }
