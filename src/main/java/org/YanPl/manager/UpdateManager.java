@@ -258,6 +258,9 @@ public class UpdateManager implements Listener {
 
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
+        if (!plugin.getConfigManager().isOpUpdateNotify()) {
+            return;
+        }
         Player player = event.getPlayer();
         if (hasUpdate && player.isOp()) {
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
