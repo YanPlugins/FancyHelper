@@ -947,6 +947,9 @@ public class CLIManager {
     }
 
     private void executeCommand(Player player, String command) {
+        // 开始数据包捕获
+        plugin.getPacketCaptureManager().startCapture(player);
+
         Bukkit.getScheduler().runTask(plugin, () -> {
             StringBuilder output = new StringBuilder();
             
@@ -1080,6 +1083,14 @@ public class CLIManager {
 
             // 延迟 1 秒（20 ticks）后再处理结果，给异步任务留出时间
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                // 停止并获取数据包捕获结果
+                String packetOutput = plugin.getPacketCaptureManager().stopCapture(player);
+                
+                if (!packetOutput.isEmpty()) {
+                    if (output.length() > 0) output.append("\n");
+                    output.append(packetOutput);
+                }
+
                 // 特殊处理：如果是 list 命令且没有捕获到输出，手动添加玩家列表
                 if (command.toLowerCase().startsWith("list") && output.length() <= 30) {
                     StringBuilder sb = new StringBuilder("当前在线玩家: ");
