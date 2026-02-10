@@ -1072,7 +1072,9 @@ public class CLIManager {
 
     private void executeCommand(Player player, String command) {
         // 开始数据包捕获
-        plugin.getPacketCaptureManager().startCapture(player);
+        if (plugin.getPacketCaptureManager() != null) {
+            plugin.getPacketCaptureManager().startCapture(player);
+        }
 
         Bukkit.getScheduler().runTask(plugin, () -> {
             StringBuilder output = new StringBuilder();
@@ -1107,7 +1109,10 @@ public class CLIManager {
             // 延迟 1 秒（20 ticks）后再处理结果，给异步任务留出时间
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 // 停止并获取数据包捕获结果
-                String packetOutput = plugin.getPacketCaptureManager().stopCapture(player);
+                String packetOutput = "";
+                if (plugin.getPacketCaptureManager() != null) {
+                    packetOutput = plugin.getPacketCaptureManager().stopCapture(player);
+                }
                 
                 // 如果 ProtocolLib 捕获到了内容，优先使用它
                 // 只有在 ProtocolLib 没捕获到且 Proxy 捕获到时，才使用 Proxy 的内容，避免重复
