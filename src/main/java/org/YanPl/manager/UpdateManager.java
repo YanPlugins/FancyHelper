@@ -90,6 +90,9 @@ public class UpdateManager implements Listener {
                     }
                     
                     String currentVersion = plugin.getDescription().getVersion();
+                    plugin.getLogger().info("当前版本: " + currentVersion + ", 最新版本: " + latestVersion);
+                    plugin.getLogger().info("auto_upgrade 配置: " + plugin.getConfigManager().isAutoUpgrade());
+                    
                     if (isNewerVersion(currentVersion, latestVersion)) {
                         hasUpdate = true;
                         Bukkit.getConsoleSender().sendMessage(ChatColor.GOLD + "[FancyHelper] " + ChatColor.YELLOW + "检测到新版本: v" + latestVersion);
@@ -98,7 +101,9 @@ public class UpdateManager implements Listener {
                         // 自动升级逻辑
                         if (plugin.getConfigManager().isAutoUpgrade()) {
                             Bukkit.getConsoleSender().sendMessage(ChatColor.GOLD + "[FancyHelper] " + ChatColor.YELLOW + "检测到自动升级已开启，正在后台下载更新...");
-                            downloadAndInstall(null, true);
+                            downloadAndInstall(null, true, true);
+                        } else {
+                            Bukkit.getConsoleSender().sendMessage(ChatColor.GOLD + "[FancyHelper] " + ChatColor.YELLOW + "如需自动下载更新，请将 config.yml 中的 auto_upgrade 设置为 true");
                         }
 
                         if (sender != null) {
@@ -139,16 +144,32 @@ public class UpdateManager implements Listener {
      * @param autoReload 是否在下载完成后自动重载
      */
     public void downloadAndInstall(Player sender, boolean autoReload) {
+        downloadAndInstall(sender, autoReload, false);
+    }
+
+    /**
+     * 下载并安装更新。
+     * @param sender 发起更新的玩家（可为 null）
+     * @param autoReload 是否在下载完成后自动重载
+     * @param alreadyAsync 是否已经在异步任务中执行
+     */
+    public void downloadAndInstall(Player sender, boolean autoReload, boolean alreadyAsync) {
+        plugin.getLogger().info("downloadAndInstall 被调用 - hasUpdate: " + hasUpdate + ", downloadUrl: " + downloadUrl);
+        
         if (!hasUpdate || downloadUrl == null) {
             if (sender != null) sender.sendMessage(ChatColor.RED + "当前没有可用的更新。");
+            plugin.getLogger().warning("无法下载更新：hasUpdate=" + hasUpdate + ", downloadUrl=" + downloadUrl);
             return;
         }
 
         if (sender != null) sender.sendMessage(ChatColor.GOLD + "[FancyHelper] " + ChatColor.YELLOW + "开始下载更新...");
 
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        Runnable downloadTask = () -> {
             String mirror = plugin.getConfigManager().getUpdateMirror();
             String finalUrl = mirror + downloadUrl;
+            
+            plugin.getLogger().info("开始下载更新，镜像源: " + mirror);
+            plugin.getLogger().info("下载URL: " + finalUrl);
 
             OkHttpClient client = new OkHttpClient.Builder()
                     .connectTimeout(30, TimeUnit.SECONDS)
@@ -169,10 +190,14 @@ public class UpdateManager implements Listener {
                 File pluginsDir = plugin.getDataFolder().getParentFile();
                 String newJarName = latestFileName;
                 File newJarFile = new File(pluginsDir, newJarName);
+                
+                plugin.getLogger().info("准备保存新版本到: " + newJarFile.getAbsolutePath());
 
                 try (BufferedSink sink = Okio.buffer(Okio.sink(newJarFile))) {
                     sink.writeAll(response.body().source());
                 }
+                
+                plugin.getLogger().info("文件下载完成，大小: " + newJarFile.length() + " 字节");
 
                 // 尝试移动旧版本到 plugins/FancyHelper/old 目录
                 File oldDir = new File(plugin.getDataFolder(), "old");
@@ -224,6 +249,7 @@ public class UpdateManager implements Listener {
                 }
 
                 if (autoReload) {
+                    plugin.getLogger().info("准备执行自动重载...");
                     Bukkit.getScheduler().runTask(plugin, () -> {
                         if (sender != null) {
                             sender.performCommand("fancy reload deeply");
@@ -238,7 +264,14 @@ public class UpdateManager implements Listener {
                     sender.sendMessage(ChatColor.GOLD + "[FancyHelper] " + ChatColor.RED + "更新下载失败: " + e.getMessage());
                 }
             }
-        });
+        };
+
+        // 根据是否已经在异步任务中来决定如何执行
+        if (alreadyAsync) {
+            downloadTask.run();
+        } else {
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, downloadTask);
+        }
     }
 
     /**
@@ -253,10 +286,14 @@ public class UpdateManager implements Listener {
         String[] currentParts = current.split("\\.");
         String[] latestParts = latest.split("\\.");
         
+        plugin.getLogger().info("版本比较 - 当前: " + current + ", 最新: " + latest);
+        
         int length = Math.max(currentParts.length, latestParts.length);
         for (int i = 0; i < length; i++) {
             int curr = i < currentParts.length ? parseVersionPart(currentParts[i]) : 0;
             int late = i < latestParts.length ? parseVersionPart(latestParts[i]) : 0;
+            
+            plugin.getLogger().info("版本部分 " + i + " - 当前: " + curr + ", 最新: " + late);
             
             if (late > curr) return true;
             if (late < curr) return false;
