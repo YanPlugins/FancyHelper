@@ -141,9 +141,47 @@ public final class FancyHelper extends JavaPlugin {
             if (enforce) {
                 getLogger().warning("====================================================");
                 getLogger().warning("检测到服务器启用了 'enforce-secure-profile'。");
-                getLogger().warning("这可能会导致 CLI 模式下的聊天拦截出现警告。");
-                getLogger().warning("建议在 server.properties 中将其设置为 false。");
+                getLogger().warning("这可能会导致 CLI 模式下的聊天拦截出现警告：");
+                getLogger().warning("'Failed to update secure chat state for <player>:");
+                getLogger().warning("Chat disabled due to missing profile public key.'");
+                getLogger().warning("");
+                getLogger().warning("正在尝试自动禁用此功能...");
                 getLogger().warning("====================================================");
+                
+                // 尝试自动修改 server.properties
+                try {
+                    java.io.File serverProperties = new java.io.File("server.properties");
+                    if (serverProperties.exists() && serverProperties.isFile()) {
+                        java.util.List<String> lines = java.nio.file.Files.readAllLines(serverProperties.toPath());
+                        boolean modified = false;
+                        java.util.List<String> newLines = new java.util.ArrayList<>();
+                        
+                        for (String line : lines) {
+                            String trimmed = line.trim();
+                            if (trimmed.toLowerCase().startsWith("enforce-secure-profile")) {
+                                newLines.add("enforce-secure-profile=false");
+                                modified = true;
+                            } else {
+                                newLines.add(line);
+                            }
+                        }
+                        
+                        if (modified) {
+                            java.nio.file.Files.write(serverProperties.toPath(), newLines);
+                            getLogger().info("已成功将 server.properties 中的 enforce-secure-profile 设置为 false");
+                            getLogger().info("请重启服务器以使更改生效");
+                        } else {
+                            getLogger().warning("未在 server.properties 中找到 enforce-secure-profile 配置项");
+                            getLogger().warning("请手动添加 enforce-secure-profile=false 到 server.properties");
+                        }
+                    } else {
+                        getLogger().warning("未找到 server.properties 文件");
+                        getLogger().warning("请手动添加 enforce-secure-profile=false 到 server.properties");
+                    }
+                } catch (Exception e) {
+                    getLogger().warning("自动修改 server.properties 失败: " + e.getMessage());
+                    getLogger().warning("请手动添加 enforce-secure-profile=false 到 server.properties");
+                }
             }
         } catch (Exception e) {
             // 反射调用可能失败，可安全忽略
