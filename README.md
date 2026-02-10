@@ -19,6 +19,25 @@ FancyHelper 是一款基于 AI 驱动的 Minecraft 服务器管理助手插件�
 - **服务器版本**: Spigot/Paper 1.18 - 1.21
 - **网络**: 服务器需能访问 CloudFlare API 接口
 
+## ⚠️ 常见问题
+
+### 安全聊天警告
+
+如果服务器日志中出现以下警告：
+
+```
+[WARN]: Failed to update secure chat state for <player>: 'Chat disabled due to missing profile public key. Please try reconnecting.'
+```
+
+**原因**：这是 Minecraft 服务器的安全聊天功能（`enforce-secure-profile`）产生的警告，不是 FancyHelper 插件的问题。当服务器启用了安全配置文件验证，但玩家的配置文件缺少公钥时就会出现此警告。
+
+**解决方案**：
+1. 打开服务器的 `server.properties` 文件
+2. 将 `enforce-secure-profile` 设置为 `false`
+3. 重启服务器
+
+**注意**：此警告不影响 FancyHelper 的正常功能，可以安全忽略。
+
 ## 🚀 快速开始
 
 ### 1. 安装插件

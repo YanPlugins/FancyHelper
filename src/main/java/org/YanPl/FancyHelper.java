@@ -141,8 +141,16 @@ public final class FancyHelper extends JavaPlugin {
             if (enforce) {
                 getLogger().warning("====================================================");
                 getLogger().warning("检测到服务器启用了 'enforce-secure-profile'。");
-                getLogger().warning("这可能会导致 CLI 模式下的聊天拦截出现警告。");
-                getLogger().warning("建议在 server.properties 中将其设置为 false。");
+                getLogger().warning("这可能会导致 CLI 模式下的聊天拦截出现警告：");
+                getLogger().warning("'Failed to update secure chat state for <player>:");
+                getLogger().warning("Chat disabled due to missing profile public key.'");
+                getLogger().warning("");
+                getLogger().warning("此警告来自 Minecraft 服务器的安全聊天功能，");
+                getLogger().warning("不影响 FancyHelper 的正常功能。");
+                getLogger().warning("");
+                getLogger().warning("如需消除此警告，请在 server.properties 中设置：");
+                getLogger().warning("enforce-secure-profile=false");
+                getLogger().warning("然后重启服务器。");
                 getLogger().warning("====================================================");
             }
         } catch (Exception e) {
