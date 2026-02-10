@@ -48,6 +48,7 @@ public class CLIManager {
         WAITING_CHOICE,
         COMPLETED,
         CANCELLED,
+        ERROR,
         IDLE
     }
 
@@ -233,6 +234,12 @@ public class CLIManager {
                             break;
                         case CANCELLED:
                             subtitle = ChatColor.RED + "- ✕ -";
+                            player.sendTitle(" ", subtitle, 0, 40, 10);
+                            generationStates.put(uuid, GenerationStatus.IDLE);
+                            generationStartTimes.remove(uuid);
+                            break;
+                        case ERROR:
+                            subtitle = ChatColor.RED + "- ERROR -";
                             player.sendTitle(" ", subtitle, 0, 40, 10);
                             generationStates.put(uuid, GenerationStatus.IDLE);
                             generationStartTimes.remove(uuid);
@@ -625,7 +632,7 @@ public class CLIManager {
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     player.sendMessage(ChatColor.RED + "AI 调用出错: " + e.getMessage());
                     isGenerating.put(uuid, false);
-                    generationStates.put(uuid, GenerationStatus.CANCELLED);
+                    generationStates.put(uuid, GenerationStatus.ERROR);
                     generationStartTimes.put(uuid, System.currentTimeMillis());
                     // 移除导致失败的消息，防止污染后续对话
                     session.removeLastMessage();
@@ -635,7 +642,7 @@ public class CLIManager {
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     player.sendMessage(ChatColor.RED + "系统内部错误: " + t.getMessage());
                     isGenerating.put(uuid, false);
-                    generationStates.put(uuid, GenerationStatus.CANCELLED);
+                    generationStates.put(uuid, GenerationStatus.ERROR);
                     generationStartTimes.put(uuid, System.currentTimeMillis());
                 });
             }
