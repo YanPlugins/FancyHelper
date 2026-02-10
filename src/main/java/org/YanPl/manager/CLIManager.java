@@ -37,6 +37,7 @@ public class CLIManager {
     private final File yoloModePlayersFile;
     private final Map<UUID, DialogueSession> sessions = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> isGenerating = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> generationStartTimes = new ConcurrentHashMap<>();
     private final Map<UUID, String> pendingCommands = new ConcurrentHashMap<>();
 
     public CLIManager(FancyHelper plugin) {
@@ -50,6 +51,7 @@ public class CLIManager {
         loadYoloAgreedPlayers();
         loadYoloModePlayers();
         startTimeoutTask();
+        startThinkingTask();
     }
 
     private void loadAgreedPlayers() {
@@ -170,6 +172,37 @@ public class CLIManager {
                 }
             }
         }.runTaskTimer(plugin, 20L * 60, 20L * 60); // 每分钟检查一次
+    }
+
+    /**
+     * 启动 AI 思考状态显示任务
+     */
+    private void startThinkingTask() {
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                long now = System.currentTimeMillis();
+                
+                // 清理不在生成状态的开始时间
+                generationStartTimes.keySet().removeIf(uuid -> !isGenerating.getOrDefault(uuid, false));
+
+                for (Map.Entry<UUID, Boolean> entry : isGenerating.entrySet()) {
+                    if (entry.getValue() != null && entry.getValue()) {
+                        UUID uuid = entry.getKey();
+                        Long startTime = generationStartTimes.computeIfAbsent(uuid, k -> now);
+                        Player player = Bukkit.getPlayer(uuid);
+                        if (player != null && player.isOnline()) {
+                            long elapsed = (now - startTime) / 1000;
+                            long minutes = elapsed / 60;
+                            long seconds = elapsed % 60;
+                            String subtitle = ChatColor.GRAY + "生成中 " + minutes + "m " + seconds + "s";
+                            // 发送标题：空白 title，动态 subtitle
+                            player.sendTitle(" ", subtitle, 0, 40, 10);
+                        }
+                    }
+                }
+            }
+        }.runTaskTimer(plugin, 20L, 20L); // 每秒更新一次
     }
 
     /**
