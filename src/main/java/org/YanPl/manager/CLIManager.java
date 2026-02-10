@@ -207,8 +207,9 @@ public class CLIManager {
                         case THINKING:
                             Long startTime = generationStartTimes.get(uuid);
                             if (startTime == null) {
-                                startTime = now;
-                                generationStartTimes.put(uuid, startTime);
+                                // 如果开始时间为空，可能是竞态条件导致的（状态已变更但计时器还未检测到）
+                                // 跳过显示，避免重新设置时间导致计时继续
+                                continue;
                             }
                             long elapsed = (now - startTime) / 1000;
                             message = ChatColor.GRAY + "- Thinking " + elapsed + "s -";
@@ -1587,12 +1588,20 @@ public class CLIManager {
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     player.sendMessage(ChatColor.RED + "AI 调用出错: " + e.getMessage());
                     isGenerating.put(uuid, false);
+                    generationStates.put(uuid, GenerationStatus.ERROR);
+                    generationStartTimes.remove(uuid);
+                    // 立即清除动作栏
+                    player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR, new TextComponent(""));
                 });
             } catch (Throwable t) {
                 plugin.getCloudErrorReport().report(t);
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     player.sendMessage(ChatColor.RED + "系统内部错误: " + t.getMessage());
                     isGenerating.put(uuid, false);
+                    generationStates.put(uuid, GenerationStatus.ERROR);
+                    generationStartTimes.remove(uuid);
+                    // 立即清除动作栏
+                    player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR, new TextComponent(""));
                 });
             }
         });
