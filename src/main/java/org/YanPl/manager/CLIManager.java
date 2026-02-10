@@ -953,127 +953,26 @@ public class CLIManager {
         Bukkit.getScheduler().runTask(plugin, () -> {
             StringBuilder output = new StringBuilder();
             
-            // 我们通过动态代理创建一个不仅实现 CommandSender，还尽量模拟 Player 行为的代理对象
-            // 注意：这里我们尝试实现 Player 接口以绕过某些原版命令的 instanceof Player 检查
-            org.bukkit.command.CommandSender interceptor = (org.bukkit.command.CommandSender) java.lang.reflect.Proxy.newProxyInstance(
-                plugin.getClass().getClassLoader(),
-                new Class<?>[]{org.bukkit.entity.Player.class},
-                (proxy, method, args) -> {
-                    String methodName = method.getName();
-                    
-                    // 拦截所有 sendMessage 和相关发送消息的方法
-                    if (methodName.equals("sendMessage") || methodName.equals("sendRawMessage") || methodName.equals("sendActionBar")) {
-                        if (args.length > 0 && args[0] != null) {
-                            if (args[0] instanceof String) {
-                                String msg = (String) args[0];
-                                if (output.length() > 0) output.append("\n");
-                                output.append(org.bukkit.ChatColor.stripColor(msg));
-                                // 转发给真实玩家
-                                if (methodName.equals("sendActionBar")) {
-                                    player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR, new net.md_5.bungee.api.chat.TextComponent(msg));
-                                } else {
-                                    player.sendMessage(msg);
-                                }
-                            } else if (args[0] instanceof String[]) {
-                                for (String msg : (String[]) args[0]) {
-                                    if (output.length() > 0) output.append("\n");
-                                    output.append(org.bukkit.ChatColor.stripColor(msg));
-                                    player.sendMessage(msg);
-                                }
-                            }
-                        }
-                        return null;
-                    }
-
-                    // 拦截标题发送
-                    if (methodName.equals("sendTitle") && args.length >= 2) {
-                        String title = args[0] != null ? args[0].toString() : "";
-                        String subtitle = args[1] != null ? args[1].toString() : "";
-                        if (!title.isEmpty() || !subtitle.isEmpty()) {
-                            if (output.length() > 0) output.append("\n");
-                            output.append("[Title] ").append(org.bukkit.ChatColor.stripColor(title));
-                            if (!subtitle.isEmpty()) output.append(" [Subtitle] ").append(org.bukkit.ChatColor.stripColor(subtitle));
-                            
-                            // 转发给玩家，使用更通用的 API 避开可能的版本不匹配
-                            try {
-                                player.sendTitle(title, subtitle, 
-                                    args.length > 2 ? (int)args[2] : 10, 
-                                    args.length > 3 ? (int)args[3] : 70, 
-                                    args.length > 4 ? (int)args[4] : 20);
-                            } catch (NoSuchMethodError e) {
-                                // 兼容极旧版本或特定的 Bukkit 环境
-                                player.sendMessage(title + " " + subtitle);
-                            }
-                        }
-                        return null;
-                    }
-                    
-                    // 拦截 spigot().sendMessage
-                    if (methodName.equals("spigot")) {
-                        return new org.bukkit.command.CommandSender.Spigot() {
-                            @Override
-                            public void sendMessage(net.md_5.bungee.api.chat.BaseComponent component) {
-                                if (component == null) return;
-                                String legacyText = net.md_5.bungee.api.chat.TextComponent.toLegacyText(component);
-                                if (output.length() > 0) output.append("\n");
-                                output.append(org.bukkit.ChatColor.stripColor(legacyText));
-                                player.spigot().sendMessage(component);
-                            }
-
-                            @Override
-                            public void sendMessage(net.md_5.bungee.api.chat.BaseComponent... components) {
-                                if (components == null) return;
-                                for (net.md_5.bungee.api.chat.BaseComponent component : components) {
-                                    sendMessage(component);
-                                }
-                            }
-                        };
-                    }
-
-                    // 其他方法（权限检查、名字等）委托给原玩家
-                    try {
-                        Object result = method.invoke(player, args);
-                        // 如果方法返回 null 且返回类型是基本类型，需要返回对应的默认值
-                        if (result == null && method.getReturnType().isPrimitive()) {
-                            Class<?> returnType = method.getReturnType();
-                            if (returnType == boolean.class) return false;
-                            if (returnType == int.class) return 0;
-                            if (returnType == double.class) return 0.0;
-                            if (returnType == float.class) return 0.0f;
-                            if (returnType == long.class) return 0L;
-                            if (returnType == byte.class) return (byte) 0;
-                            if (returnType == short.class) return (short) 0;
-                            if (returnType == char.class) return '\0';
-                        }
-                        return result;
-                    } catch (java.lang.reflect.InvocationTargetException e) {
-                        // 记录异常但不崩溃，尽量让命令继续执行
-                        plugin.getLogger().warning("[CLI] Method " + methodName + " threw exception: " + e.getCause().getMessage());
-                        plugin.getCloudErrorReport().report(e.getCause());
-                        throw e.getCause();
-                    } catch (Exception e) {
-                        plugin.getCloudErrorReport().report(e);
-                        return null;
-                    }
-                }
-            );
+            // 检查是否为原版命令或特定需要避开拦截器的命令
+            String cmdName = command.split(" ")[0].toLowerCase();
+            if (cmdName.startsWith("/")) cmdName = cmdName.substring(1);
+            boolean isVanilla = cmdName.startsWith("minecraft:") || 
+                               Arrays.asList("fill", "setblock", "tp", "teleport", "give", "gamemode", "spawnpoint", "weather", "time", "msg", "tell", "w", "say", "list", "execute").contains(cmdName);
 
             boolean success = false;
-            try {
-                // 优先尝试使用拦截器执行，以捕获输出
-                success = Bukkit.dispatchCommand(interceptor, command);
-            } catch (Throwable t) {
-                plugin.getCloudErrorReport().report(t);
-                // 如果拦截器执行过程中抛出异常（通常是因为类型转换失败，如 VanillaCommandWrapper）
-                // 针对原版命令，我们尝试使用 execute 包装器来绕过类型检查
+            
+            if (!isVanilla) {
+                // 对于非原版命令，尝试使用拦截器以捕获可能的 sendMessage 输出
                 try {
-                    String wrappedCommand = "execute as " + player.getName() + " run " + command;
-                    success = Bukkit.dispatchCommand(interceptor, wrappedCommand);
-                } catch (Throwable t2) {
-                    plugin.getLogger().warning("[CLI] Interceptor failed even with wrapped command: " + t2.getMessage());
-                    // 最后的手段：退回到使用真实玩家身份执行，但这意味着无法捕获输出
+                    org.bukkit.command.CommandSender interceptor = createInterceptor(player, output);
+                    success = Bukkit.dispatchCommand(interceptor, command);
+                } catch (Throwable t) {
+                    // 如果拦截器失败（如 VanillaCommandWrapper 报错），则回退到真实玩家
                     success = player.performCommand(command);
                 }
+            } else {
+                // 对于原版命令，直接使用玩家执行，依靠 ProtocolLib 捕获输出
+                success = player.performCommand(command);
             }
 
             boolean finalSuccess = success;
@@ -1086,20 +985,12 @@ public class CLIManager {
                 // 停止并获取数据包捕获结果
                 String packetOutput = plugin.getPacketCaptureManager().stopCapture(player);
                 
-                if (!packetOutput.isEmpty()) {
-                    if (output.length() > 0) output.append("\n");
-                    output.append(packetOutput);
-                }
-
-                // 特殊处理：如果是 list 命令且没有捕获到输出，手动添加玩家列表
-                if (command.toLowerCase().startsWith("list") && output.length() <= 30) {
-                    StringBuilder sb = new StringBuilder("当前在线玩家: ");
-                    Bukkit.getOnlinePlayers().forEach(p -> sb.append(p.getName()).append(", "));
-                    output.append("\n").append(sb.toString());
-                }
-                
+                // 如果 ProtocolLib 捕获到了内容，优先使用它
+                // 只有在 ProtocolLib 没捕获到且 Proxy 捕获到时，才使用 Proxy 的内容，避免重复
                 String finalResult;
-                if (output.length() > 0) {
+                if (!packetOutput.isEmpty()) {
+                    finalResult = packetOutput;
+                } else if (output.length() > 0) {
                     finalResult = output.toString();
                 } else if (finalSuccess) {
                     // 如果成功但没有捕获到输出，尝试给 AI 提供更具体的上下文
@@ -1121,6 +1012,114 @@ public class CLIManager {
                 feedbackToAI(player, "#run_result: " + finalResult);
             }, 20L);
         });
+    }
+
+    /**
+     * 创建一个用于拦截命令输出的代理对象
+     */
+    private org.bukkit.command.CommandSender createInterceptor(Player player, StringBuilder output) {
+        return (org.bukkit.command.CommandSender) java.lang.reflect.Proxy.newProxyInstance(
+            plugin.getClass().getClassLoader(),
+            new Class<?>[]{org.bukkit.entity.Player.class},
+            (proxy, method, args) -> {
+                String methodName = method.getName();
+                
+                // 拦截所有 sendMessage 和相关发送消息的方法
+                if (methodName.equals("sendMessage") || methodName.equals("sendRawMessage") || methodName.equals("sendActionBar")) {
+                    if (args.length > 0 && args[0] != null) {
+                        if (args[0] instanceof String) {
+                            String msg = (String) args[0];
+                            if (output.length() > 0) output.append("\n");
+                            output.append(org.bukkit.ChatColor.stripColor(msg));
+                            // 转发给真实玩家
+                            if (methodName.equals("sendActionBar")) {
+                                player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR, new net.md_5.bungee.api.chat.TextComponent(msg));
+                            } else {
+                                player.sendMessage(msg);
+                            }
+                        } else if (args[0] instanceof String[]) {
+                            for (String msg : (String[]) args[0]) {
+                                if (output.length() > 0) output.append("\n");
+                                output.append(org.bukkit.ChatColor.stripColor(msg));
+                                player.sendMessage(msg);
+                            }
+                        }
+                    }
+                    return null;
+                }
+
+                // 拦截标题发送
+                if (methodName.equals("sendTitle") && args.length >= 2) {
+                    String title = args[0] != null ? args[0].toString() : "";
+                    String subtitle = args[1] != null ? args[1].toString() : "";
+                    if (!title.isEmpty() || !subtitle.isEmpty()) {
+                        if (output.length() > 0) output.append("\n");
+                        output.append("[Title] ").append(org.bukkit.ChatColor.stripColor(title));
+                        if (!subtitle.isEmpty()) output.append(" [Subtitle] ").append(org.bukkit.ChatColor.stripColor(subtitle));
+                        
+                        // 转发给玩家，使用更通用的 API 避开可能的版本不匹配
+                        try {
+                            player.sendTitle(title, subtitle, 
+                                args.length > 2 ? (int)args[2] : 10, 
+                                args.length > 3 ? (int)args[3] : 70, 
+                                args.length > 4 ? (int)args[4] : 20);
+                        } catch (NoSuchMethodError e) {
+                            // 兼容极旧版本或特定的 Bukkit 环境
+                            player.sendMessage(title + " " + subtitle);
+                        }
+                    }
+                    return null;
+                }
+                
+                // 拦截 spigot().sendMessage
+                if (methodName.equals("spigot")) {
+                    return new org.bukkit.command.CommandSender.Spigot() {
+                        @Override
+                        public void sendMessage(net.md_5.bungee.api.chat.BaseComponent component) {
+                            if (component == null) return;
+                            String legacyText = net.md_5.bungee.api.chat.TextComponent.toLegacyText(component);
+                            if (output.length() > 0) output.append("\n");
+                            output.append(org.bukkit.ChatColor.stripColor(legacyText));
+                            player.spigot().sendMessage(component);
+                        }
+
+                        @Override
+                        public void sendMessage(net.md_5.bungee.api.chat.BaseComponent... components) {
+                            if (components == null) return;
+                            for (net.md_5.bungee.api.chat.BaseComponent component : components) {
+                                sendMessage(component);
+                            }
+                        }
+                    };
+                }
+
+                // 其他方法（权限检查、名字等）委托给原玩家
+                try {
+                    Object result = method.invoke(player, args);
+                    // 如果方法返回 null 且返回类型是基本类型，需要返回对应的默认值
+                    if (result == null && method.getReturnType().isPrimitive()) {
+                        Class<?> returnType = method.getReturnType();
+                        if (returnType == boolean.class) return false;
+                        if (returnType == int.class) return 0;
+                        if (returnType == double.class) return 0.0;
+                        if (returnType == float.class) return 0.0f;
+                        if (returnType == long.class) return 0L;
+                        if (returnType == byte.class) return (byte) 0;
+                        if (returnType == short.class) return (short) 0;
+                        if (returnType == char.class) return '\0';
+                    }
+                    return result;
+                } catch (java.lang.reflect.InvocationTargetException e) {
+                    // 记录异常但不崩溃，尽量让命令继续执行
+                    plugin.getLogger().warning("[CLI] Method " + methodName + " threw exception: " + e.getCause().getMessage());
+                    plugin.getCloudErrorReport().report(e.getCause());
+                    throw e.getCause();
+                } catch (Exception e) {
+                    plugin.getCloudErrorReport().report(e);
+                    return null;
+                }
+            }
+        );
     }
 
     private void handleGetTool(Player player, String fileName) {
