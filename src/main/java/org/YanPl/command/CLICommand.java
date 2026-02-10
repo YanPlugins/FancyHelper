@@ -74,7 +74,7 @@ public class CLICommand implements CommandExecutor, TabCompleter {
                 break;
             case "update":
             case "checkupdate":
-                if (!sender.hasPermission("fancyhelper.reload")) {
+                if (!(sender.isOp() || sender.hasPermission("fancyhelper.reload"))) {
                     sender.sendMessage(ChatColor.RED + "你没有权限检查更新。");
                     return true;
                 }
