@@ -44,20 +44,19 @@ public final class FancyHelper extends JavaPlugin {
         // 初始化验证管理器
         verificationManager = new VerificationManager(this);
         
-        // 强制检查 ProtocolLib 依赖
-        if (!getServer().getPluginManager().isPluginEnabled("ProtocolLib")) {
-            getLogger().severe("==================");
-            getLogger().severe("未检测到 ProtocolLib！");
-            getLogger().severe("FancyHelper 需要 ProtocolLib 才能正常工作。");
-            getLogger().severe("请前往 https://www.spigotmc.org/resources/protocollib.1997/ 下载并安装。");
-            getLogger().severe("FancyHelper将自动卸载。");
-            getLogger().severe("==================");
-            getServer().getPluginManager().disablePlugin(this);
-            return;
+        // 检查 ProtocolLib 依赖（改为可选）
+        if (getServer().getPluginManager().isPluginEnabled("ProtocolLib")) {
+            // 初始化数据包捕获管理器
+            packetCaptureManager = new PacketCaptureManager(this);
+            getLogger().info("已检测到 ProtocolLib，启用高级功能。");
+        } else {
+            getLogger().warning("==================");
+            getLogger().warning("未检测到 ProtocolLib！");
+            getLogger().warning("FancyHelper 的部分高级功能（如命令输出捕获）将无法使用。");
+            getLogger().warning("建议前往 https://www.spigotmc.org/resources/protocollib.1997/ 下载并安装以获得最佳体验。");
+            getLogger().warning("==================");
+            packetCaptureManager = null;
         }
-        
-        // 初始化数据包捕获管理器
-        packetCaptureManager = new PacketCaptureManager(this);
         
         // 异步索引服务器命令与预设文件
         workspaceIndexer = new WorkspaceIndexer(this);

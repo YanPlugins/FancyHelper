@@ -2,7 +2,7 @@ name: FancyHelper
 version: 2.5.4
 main: org.YanPl.FancyHelper
 api-version: '1.18'
-depend: [ProtocolLib]
+softdepend: [ProtocolLib]
 authors: [ baicaizhale , zip8919 ]
 commands:
   fancyhelper:
