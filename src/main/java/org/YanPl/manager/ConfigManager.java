@@ -52,6 +52,10 @@ public class ConfigManager {
         }
     }
 
+    /**
+     * 检查并更新配置文件版本。
+     * 当插件版本与配置版本不一致时，备份旧配置并迁移配置项。
+     */
     private void checkAndUpdateConfig() {
         File configFile = new File(plugin.getDataFolder(), "config.yml");
         // 如果尚无配置文件则直接返回（后续 saveDefaultConfig 会生成）
@@ -66,6 +70,14 @@ public class ConfigManager {
         if (!configVersion.equals(pluginVersion)) {
             plugin.getLogger().info("检测到版本更新 (" + configVersion + " -> " + pluginVersion + ")，正在更新配置...");
 
+            // 1. 保存为 config.yml.old
+            File oldConfigFile = new File(plugin.getDataFolder(), "config.yml.old");
+            try {
+                java.nio.file.Files.copy(configFile.toPath(), oldConfigFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                plugin.getLogger().warning("备份旧配置文件失败: " + e.getMessage());
+            }
+
             // 版本更新时强制更新 EULA 和 License
             if (plugin.getEulaManager() != null) {
                 plugin.getEulaManager().forceReplaceFiles();
@@ -73,11 +85,13 @@ public class ConfigManager {
 
             Map<String, Object> oldValues = new HashMap<>();
             for (String key : currentConfig.getKeys(true)) {
-                if (!key.equals("version")) {
+                // 仅迁移具体的配置项值，避免覆盖整个配置节导致新版本增加的默认项丢失
+                if (!key.equals("version") && !currentConfig.isConfigurationSection(key)) {
                     oldValues.put(key, currentConfig.get(key));
                 }
             }
 
+            // 2. 释放新配置
             configFile.delete();
             File presetDir = new File(plugin.getDataFolder(), "preset");
             if (presetDir.exists()) {
@@ -87,6 +101,7 @@ public class ConfigManager {
             plugin.saveDefaultConfig();
             ResourceUtil.releaseResources(plugin, "preset/", true, ".txt");
 
+            // 3. 把旧配置写入新配置
             FileConfiguration newConfig = YamlConfiguration.loadConfiguration(configFile);
             for (Map.Entry<String, Object> entry : oldValues.entrySet()) {
                 if (newConfig.contains(entry.getKey())) {
@@ -100,6 +115,23 @@ public class ConfigManager {
             } catch (IOException e) {
                 plugin.getLogger().severe("保存新配置文件时出错: " + e.getMessage());
                 plugin.getCloudErrorReport().report(e);
+            }
+
+            // 4. 把 config.yml.old 丢进 plugins\FancyHelper\old
+            File oldDir = new File(plugin.getDataFolder(), "old");
+            if (!oldDir.exists()) {
+                oldDir.mkdirs();
+            }
+            File finalOldFile = new File(oldDir, "config.yml.old");
+            if (oldConfigFile.exists()) {
+                if (finalOldFile.exists()) {
+                    finalOldFile.delete();
+                }
+                if (oldConfigFile.renameTo(finalOldFile)) {
+                    plugin.getLogger().info("旧配置文件已移动至 " + finalOldFile.getPath());
+                } else {
+                    plugin.getLogger().warning("无法移动旧配置文件到 old 目录。");
+                }
             }
         }
     }
