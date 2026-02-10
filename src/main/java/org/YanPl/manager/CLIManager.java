@@ -337,8 +337,6 @@ public class CLIManager {
         if (session == null) return;
 
         isGenerating.put(uuid, true); // 设置生成状态，防止在此期间玩家输入触发新的 AI 调用
-        generationStates.put(uuid, GenerationStatus.THINKING);
-        generationStartTimes.put(uuid, System.currentTimeMillis());
 
         // 进入 CLI 后 0.3s 延迟展示 (约 6 ticks)
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -386,7 +384,6 @@ public class CLIManager {
             } finally {
                 // 确保生成状态为 false，允许玩家开始输入
                 isGenerating.put(uuid, false);
-                generationStates.put(uuid, GenerationStatus.COMPLETED);
             }
         }, 6L);
     }
