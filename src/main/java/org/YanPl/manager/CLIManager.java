@@ -1463,12 +1463,20 @@ public class CLIManager {
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     player.sendMessage(ChatColor.RED + "AI 调用出错: " + e.getMessage());
                     isGenerating.put(uuid, false);
+                    generationStates.put(uuid, GenerationStatus.ERROR);
+                    generationStartTimes.remove(uuid);
+                    // 立即清除动作栏
+                    player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR, new TextComponent(""));
                 });
             } catch (Throwable t) {
                 plugin.getCloudErrorReport().report(t);
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     player.sendMessage(ChatColor.RED + "系统内部错误: " + t.getMessage());
                     isGenerating.put(uuid, false);
+                    generationStates.put(uuid, GenerationStatus.ERROR);
+                    generationStartTimes.remove(uuid);
+                    // 立即清除动作栏
+                    player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR, new TextComponent(""));
                 });
             }
         });
