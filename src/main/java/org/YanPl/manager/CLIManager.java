@@ -37,7 +37,20 @@ public class CLIManager {
     private final File yoloModePlayersFile;
     private final Map<UUID, DialogueSession> sessions = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> isGenerating = new ConcurrentHashMap<>();
+    private final Map<UUID, GenerationStatus> generationStates = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> generationStartTimes = new ConcurrentHashMap<>();
     private final Map<UUID, String> pendingCommands = new ConcurrentHashMap<>();
+
+    public enum GenerationStatus {
+        THINKING,
+        EXECUTING_TOOL,
+        WAITING_CONFIRM,
+        WAITING_CHOICE,
+        COMPLETED,
+        CANCELLED,
+        ERROR,
+        IDLE
+    }
 
     public CLIManager(FancyHelper plugin) {
         this.plugin = plugin;
@@ -50,6 +63,7 @@ public class CLIManager {
         loadYoloAgreedPlayers();
         loadYoloModePlayers();
         startTimeoutTask();
+        startThinkingTask();
     }
 
     private void loadAgreedPlayers() {
@@ -173,6 +187,72 @@ public class CLIManager {
     }
 
     /**
+     * 启动 AI 思考状态显示任务
+     */
+    private void startThinkingTask() {
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                long now = System.currentTimeMillis();
+                
+                for (UUID uuid : activeCLIPayers) {
+                    Player player = Bukkit.getPlayer(uuid);
+                    if (player == null || !player.isOnline()) continue;
+
+                    GenerationStatus status = generationStates.getOrDefault(uuid, GenerationStatus.IDLE);
+                    if (status == GenerationStatus.IDLE) continue;
+
+                    String subtitle = "";
+                    switch (status) {
+                        case THINKING:
+                            Long startTime = generationStartTimes.get(uuid);
+                            if (startTime == null) {
+                                startTime = now;
+                                generationStartTimes.put(uuid, startTime);
+                            }
+                            long elapsed = (now - startTime) / 1000;
+                            subtitle = ChatColor.GRAY + "- Thinking " + elapsed + "s -";
+                            player.sendTitle(" ", subtitle, 0, 40, 0);
+                            break;
+                        case EXECUTING_TOOL:
+                            subtitle = ChatColor.GRAY + "....";
+                            player.sendTitle(" ", subtitle, 0, 40, 0);
+                            break;
+                        case WAITING_CONFIRM:
+                            subtitle = ChatColor.YELLOW + "正在征求您的许可...";
+                            player.sendTitle(" ", subtitle, 0, 40, 0);
+                            break;
+                        case WAITING_CHOICE:
+                            subtitle = ChatColor.AQUA + "正在征求您的意见...";
+                            player.sendTitle(" ", subtitle, 0, 40, 0);
+                            break;
+                        case COMPLETED:
+                            subtitle = ChatColor.GREEN + "- ✓ -";
+                            player.sendTitle(" ", subtitle, 0, 40, 10);
+                            generationStates.put(uuid, GenerationStatus.IDLE);
+                            generationStartTimes.remove(uuid);
+                            break;
+                        case CANCELLED:
+                            subtitle = ChatColor.RED + "- ✕ -";
+                            player.sendTitle(" ", subtitle, 0, 40, 10);
+                            generationStates.put(uuid, GenerationStatus.IDLE);
+                            generationStartTimes.remove(uuid);
+                            break;
+                        case ERROR:
+                            subtitle = ChatColor.RED + "- ERROR -";
+                            player.sendTitle(" ", subtitle, 0, 40, 10);
+                            generationStates.put(uuid, GenerationStatus.IDLE);
+                            generationStartTimes.remove(uuid);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+        }.runTaskTimer(plugin, 5L, 5L); // 提高更新频率到 0.25s，让计时更平滑
+    }
+
+    /**
      * 切换玩家的 CLI 模式
      */
     public void toggleCLI(Player player) {
@@ -199,6 +279,8 @@ public class CLIManager {
         sessions.clear();
         isGenerating.clear();
         pendingCommands.clear();
+        generationStates.clear();
+        generationStartTimes.clear();
         
         // 关闭AI客户端（这会处理OkHttp的cleanup）
         if (ai != null) {
@@ -255,6 +337,8 @@ public class CLIManager {
         if (session == null) return;
 
         isGenerating.put(uuid, true); // 设置生成状态，防止在此期间玩家输入触发新的 AI 调用
+        generationStates.put(uuid, GenerationStatus.THINKING);
+        generationStartTimes.put(uuid, System.currentTimeMillis());
 
         // 进入 CLI 后 0.3s 延迟展示 (约 6 ticks)
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -302,6 +386,7 @@ public class CLIManager {
             } finally {
                 // 确保生成状态为 false，允许玩家开始输入
                 isGenerating.put(uuid, false);
+                generationStates.put(uuid, GenerationStatus.COMPLETED);
             }
         }, 6L);
     }
@@ -318,6 +403,8 @@ public class CLIManager {
         pendingYoloAgreementPlayers.remove(uuid);
         sessions.remove(uuid);
         isGenerating.remove(uuid);
+        generationStates.remove(uuid);
+        generationStartTimes.remove(uuid);
     }
 
     public void switchMode(Player player, DialogueSession.Mode targetMode) {
@@ -369,6 +456,7 @@ public class CLIManager {
             String cmd = pendingCommands.get(uuid);
             if (!"CHOOSING".equals(cmd)) {
                 pendingCommands.remove(uuid);
+                generationStates.put(uuid, GenerationStatus.EXECUTING_TOOL);
                 if (cmd.startsWith("LS:") || cmd.startsWith("READ:") || cmd.startsWith("DIFF:")) {
                     String[] parts = cmd.split(":", 2);
                     String type = parts[0].toLowerCase();
@@ -406,6 +494,8 @@ public class CLIManager {
             pendingCommands.remove(uuid);
             player.sendMessage(ChatColor.GRAY + "⇒ 命令已取消");
             isGenerating.put(uuid, false);
+            generationStates.put(uuid, GenerationStatus.CANCELLED);
+            generationStartTimes.put(uuid, System.currentTimeMillis());
         }
     }
 
@@ -466,6 +556,8 @@ public class CLIManager {
                 boolean interrupted = false;
                 if (isGenerating.getOrDefault(uuid, false)) {
                     isGenerating.put(uuid, false);
+                    generationStates.put(uuid, GenerationStatus.CANCELLED);
+                    generationStartTimes.put(uuid, System.currentTimeMillis());
                     player.sendMessage(ChatColor.YELLOW + "⇒ 已打断 Fancy 生成");
                     interrupted = true;
                 }
@@ -473,6 +565,8 @@ public class CLIManager {
                     pendingCommands.remove(uuid);
                     player.sendMessage(ChatColor.GRAY + "⇒ 已取消当前待处理的操作");
                     isGenerating.put(uuid, false);
+                    generationStates.put(uuid, GenerationStatus.CANCELLED);
+                    generationStartTimes.put(uuid, System.currentTimeMillis());
                     interrupted = true;
                 }
                 if (!interrupted) {
@@ -492,12 +586,9 @@ public class CLIManager {
                 }
                 
                 if (message.equalsIgnoreCase("y") || message.equalsIgnoreCase("/fancyhelper confirm")) {
-                    String cmd = pendingCommands.remove(uuid);
-                    executeCommand(player, cmd);
+                    handleConfirm(player);
                 } else if (message.equalsIgnoreCase("n") || message.equalsIgnoreCase("/fancyhelper cancel")) {
-                    pendingCommands.remove(uuid);
-                    player.sendMessage(ChatColor.GRAY + "⇒ 命令已取消");
-                    isGenerating.put(uuid, false);
+                    handleCancel(player);
                 } else {
                     player.sendMessage(ChatColor.RED + "请确认命令 [Y/N]");
                 }
@@ -523,6 +614,8 @@ public class CLIManager {
 
         session.addMessage("user", message);
         isGenerating.put(uuid, true);
+        generationStates.put(uuid, GenerationStatus.THINKING);
+        generationStartTimes.put(uuid, System.currentTimeMillis());
 
         player.sendMessage(ChatColor.GRAY + "◇ " + message);
         // 不再主动发送 Thought...，避免干扰用户
@@ -540,6 +633,8 @@ public class CLIManager {
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     player.sendMessage(ChatColor.RED + "AI 调用出错: " + e.getMessage());
                     isGenerating.put(uuid, false);
+                    generationStates.put(uuid, GenerationStatus.ERROR);
+                    generationStartTimes.put(uuid, System.currentTimeMillis());
                     // 移除导致失败的消息，防止污染后续对话
                     session.removeLastMessage();
                 });
@@ -548,6 +643,8 @@ public class CLIManager {
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     player.sendMessage(ChatColor.RED + "系统内部错误: " + t.getMessage());
                     isGenerating.put(uuid, false);
+                    generationStates.put(uuid, GenerationStatus.ERROR);
+                    generationStartTimes.put(uuid, System.currentTimeMillis());
                 });
             }
         });
@@ -557,6 +654,10 @@ public class CLIManager {
         UUID uuid = player.getUniqueId();
         DialogueSession session = sessions.get(uuid);
         if (session == null) return;
+
+        // 收到 AI 回复，立即停止计时
+        generationStates.put(uuid, GenerationStatus.COMPLETED);
+        generationStartTimes.put(uuid, System.currentTimeMillis());
 
         // 如果生成已被打断，则丢弃响应
         if (!isGenerating.getOrDefault(uuid, false)) {
@@ -646,6 +747,7 @@ public class CLIManager {
             executeTool(player, toolCall);
         } else {
             isGenerating.put(uuid, false);
+            generationStates.put(uuid, GenerationStatus.COMPLETED);
             checkTokenWarning(player, session);
         }
     }
@@ -711,6 +813,7 @@ public class CLIManager {
         switch (lowerToolName) {
             case "#over":
                 isGenerating.put(uuid, false);
+                generationStates.put(uuid, GenerationStatus.COMPLETED);
                 break;
             case "#exit":
                 exitCLI(player);
@@ -768,11 +871,13 @@ public class CLIManager {
         // 如果是 YOLO 模式，直接执行
         if (session != null && session.getMode() == DialogueSession.Mode.YOLO) {
             player.sendMessage(ChatColor.GOLD + "⇒ YOLO run " + ChatColor.WHITE + cleanCommand);
+            generationStates.put(uuid, GenerationStatus.EXECUTING_TOOL);
             executeCommand(player, cleanCommand);
             return;
         }
         
         pendingCommands.put(uuid, cleanCommand);
+        generationStates.put(uuid, GenerationStatus.WAITING_CONFIRM);
 
         sendConfirmButtons(player, cleanCommand);
     }
@@ -795,11 +900,13 @@ public class CLIManager {
             
             // YOLO 模式下也需要检查权限开启，但不需要手动确认
             if (plugin.getConfigManager().isPlayerToolEnabled(player, type)) {
+                generationStates.put(uuid, GenerationStatus.EXECUTING_TOOL);
                 executeFileOperation(player, type, args);
             } else {
                 player.sendMessage(ChatColor.YELLOW + "检测到 YOLO 模式调用 " + type + "，但该工具尚未完成首次验证。");
                 plugin.getVerificationManager().startVerification(player, type, () -> {
                     plugin.getConfigManager().setPlayerToolEnabled(player, type, true);
+                    generationStates.put(uuid, GenerationStatus.EXECUTING_TOOL);
                     executeFileOperation(player, type, args);
                 });
             }
@@ -808,6 +915,7 @@ public class CLIManager {
         
         String pendingStr = type.toUpperCase() + ":" + args;
         pendingCommands.put(uuid, pendingStr);
+        generationStates.put(uuid, GenerationStatus.WAITING_CONFIRM);
 
         String actionDesc = type.equals("ls") ? "列出目录" : (type.equals("read") ? "读取文件" : "修改文件内容");
         sendConfirmButtons(player, actionDesc + " " + args);
@@ -1126,6 +1234,7 @@ public class CLIManager {
     }
 
     private void handleGetTool(Player player, String fileName) {
+        generationStates.put(player.getUniqueId(), GenerationStatus.EXECUTING_TOOL);
         File presetFile = new File(plugin.getDataFolder(), "preset/" + fileName);
         if (!presetFile.exists()) {
             feedbackToAI(player, "#get_result: 文件不存在");
@@ -1162,10 +1271,12 @@ public class CLIManager {
         player.spigot().sendMessage(message);
         // 标记玩家正在进行选择，以便拦截点击后的 RUN_COMMAND
         pendingCommands.put(player.getUniqueId(), "CHOOSING"); 
+        generationStates.put(player.getUniqueId(), GenerationStatus.WAITING_CHOICE);
     }
 
     private void handleSearchTool(Player player, String query) {
         player.sendMessage(ChatColor.GRAY + "〇 #search: " + query);
+        generationStates.put(player.getUniqueId(), GenerationStatus.EXECUTING_TOOL);
         
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             String result;
@@ -1316,6 +1427,8 @@ public class CLIManager {
 
         session.addMessage("user", feedback);
         isGenerating.put(uuid, true);
+        generationStates.put(uuid, GenerationStatus.THINKING);
+        generationStartTimes.put(uuid, System.currentTimeMillis());
 
         // 工具返回信息不显示给玩家，仅在日志记录并触发 AI 思考
         plugin.getLogger().info("[CLI] Feedback sent to AI for " + player.getName() + ": " + feedback);
