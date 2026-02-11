@@ -23,6 +23,10 @@ FancyHelper 是一款基于 AI 驱动的 Minecraft 服务器管理助手插件�
 
 <img src="./pic/1.webp" alt="FancyHelper预览图1" width="200"/>
 <img src="./pic/2.webp" alt="FancyHelper预览图2" width="200"/>
+<img src="./pic/3.webp" alt="FancyHelper预览图3" width="200"/>
+<img src="./pic/4.webp" alt="FancyHelper预览图4" width="200"/>
+<img src="./pic/5.webp" alt="FancyHelper预览图5" width="200"/>
+<img src="./pic/6.webp" alt="FancyHelper预览图6" width="200"/>
 
 </details>
 
