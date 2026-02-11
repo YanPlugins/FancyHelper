@@ -185,13 +185,19 @@ public class CloudFlareAI {
 
         JsonObject bodyJson = new JsonObject();
         bodyJson.addProperty("model", model);
+        bodyJson.addProperty("max_tokens", 4096);
+
         if (useResponsesApi) {
             bodyJson.add("input", messagesArray);
             JsonObject reasoning = new JsonObject();
             reasoning.addProperty("effort", "medium");
+            reasoning.addProperty("summary", "detailed");
             bodyJson.add("reasoning", reasoning);
         } else {
             bodyJson.add("messages", messagesArray);
+            if (model.contains("gpt") || model.contains("o1") || model.contains("deepseek-reasoner")) {
+                bodyJson.addProperty("reasoning_effort", "medium");
+            }
         }
 
         String bodyString = gson.toJson(bodyJson);
@@ -253,13 +259,19 @@ public class CloudFlareAI {
 
                     JsonObject simpleBody = new JsonObject();
                     simpleBody.addProperty("model", model);
+                    simpleBody.addProperty("max_tokens", 4096);
+
                     if (useResponsesApi) {
                         simpleBody.add("input", simpleInput);
                         JsonObject reasoning = new JsonObject();
                         reasoning.addProperty("effort", "medium");
+                        reasoning.addProperty("summary", "detailed");
                         simpleBody.add("reasoning", reasoning);
                     } else {
                         simpleBody.add("messages", simpleInput);
+                        if (model.contains("gpt") || model.contains("o1") || model.contains("deepseek-reasoner")) {
+                            simpleBody.addProperty("reasoning_effort", "medium");
+                        }
                     }
 
                     String simpleBodyString = gson.toJson(simpleBody);
@@ -304,32 +316,65 @@ public class CloudFlareAI {
                     }
 
                     // 2. 尝试解析 Cloudflare 原生 output 格式
-                    if (textC == null && responseJson.has("output") && responseJson.get("output").isJsonArray()) {
+                    if (responseJson.has("output") && responseJson.get("output").isJsonArray()) {
                         JsonArray outputArray = responseJson.getAsJsonArray("output");
                         for (int i = 0; i < outputArray.size(); i++) {
                             JsonObject item = outputArray.get(i).getAsJsonObject();
-                            if (item.has("type") && "message".equals(item.get("type").getAsString())) {
+                            String itemType = item.has("type") ? item.get("type").getAsString() : "";
+                            if ("message".equals(itemType)) {
                                 if (item.has("content") && item.get("content").isJsonArray()) {
                                     JsonArray contents = item.getAsJsonArray("content");
                                     for (int j = 0; j < contents.size(); j++) {
                                         JsonObject contentObj = contents.get(j).getAsJsonObject();
                                         String type = contentObj.has("type") ? contentObj.get("type").getAsString() : "";
-                                        if ("output_text".equals(type)) {
+                                        if ("output_text".equals(type) && textC == null) {
                                             textC = contentObj.get("text").isJsonNull() ? null : contentObj.get("text").getAsString();
-                                        } else if ("thought".equals(type) || "reasoning".equals(type)) {
+                                        } else if (("thought".equals(type) || "reasoning".equals(type)) && thoughtC == null) {
                                             thoughtC = contentObj.get("text").isJsonNull() ? null : contentObj.get("text").getAsString();
                                         }
                                     }
+                                }
+                            } else if ("reasoning".equals(itemType) && thoughtC == null) {
+                                if (item.has("summary")) {
+                                    if (item.get("summary").isJsonArray()) {
+                                        JsonArray summaryArray = item.getAsJsonArray("summary");
+                                        StringBuilder sb = new StringBuilder();
+                                        for (int j = 0; j < summaryArray.size(); j++) {
+                                            JsonObject summaryObj = summaryArray.get(j).getAsJsonObject();
+                                            if (summaryObj.has("text") && !summaryObj.get("text").isJsonNull()) {
+                                                if (sb.length() > 0) sb.append("\n");
+                                                sb.append(summaryObj.get("text").getAsString());
+                                            }
+                                        }
+                                        if (sb.length() > 0) thoughtC = sb.toString();
+                                    } else if (item.get("summary").isJsonPrimitive()) {
+                                        thoughtC = item.get("summary").getAsString();
+                                    }
+                                }
+                                if (thoughtC == null && item.has("content") && item.get("content").isJsonArray()) {
+                                    JsonArray contents = item.getAsJsonArray("content");
+                                    StringBuilder sb = new StringBuilder();
+                                    for (int j = 0; j < contents.size(); j++) {
+                                        JsonObject contentObj = contents.get(j).getAsJsonObject();
+                                        String type = contentObj.has("type") ? contentObj.get("type").getAsString() : "";
+                                        if ("reasoning_text".equals(type) && contentObj.has("text") && !contentObj.get("text").isJsonNull()) {
+                                            if (sb.length() > 0) sb.append("\n");
+                                            sb.append(contentObj.get("text").getAsString());
+                                        }
+                                    }
+                                    if (sb.length() > 0) thoughtC = sb.toString();
                                 }
                             }
                         }
                     }
 
                     // 3. 尝试解析 Cloudflare 原生 result 格式
-                    if (textC == null && responseJson.has("result")) {
+                    if (responseJson.has("result")) {
                         JsonObject result = responseJson.getAsJsonObject("result");
-                        if (result.has("response")) textC = result.get("response").isJsonNull() ? null : result.get("response").getAsString();
-                        else if (result.has("text")) textC = result.get("text").isJsonNull() ? null : result.get("text").getAsString();
+                        if (textC == null) {
+                            if (result.has("response")) textC = result.get("response").isJsonNull() ? null : result.get("response").getAsString();
+                            else if (result.has("text")) textC = result.get("text").isJsonNull() ? null : result.get("text").getAsString();
+                        }
 
                         if (thoughtC == null) {
                             if (result.has("reasoning")) thoughtC = result.get("reasoning").isJsonNull() ? null : result.get("reasoning").getAsString();
@@ -369,32 +414,65 @@ public class CloudFlareAI {
             }
 
             // 2. 尝试解析 Cloudflare 原生 output 格式
-            if (textContent == null && responseJson.has("output") && responseJson.get("output").isJsonArray()) {
+            if (responseJson.has("output") && responseJson.get("output").isJsonArray()) {
                 JsonArray outputArray = responseJson.getAsJsonArray("output");
                 for (int i = 0; i < outputArray.size(); i++) {
                     JsonObject item = outputArray.get(i).getAsJsonObject();
-                    if (item.has("type") && "message".equals(item.get("type").getAsString())) {
+                    String itemType = item.has("type") ? item.get("type").getAsString() : "";
+                    if ("message".equals(itemType)) {
                         if (item.has("content") && item.get("content").isJsonArray()) {
                             JsonArray contents = item.getAsJsonArray("content");
                             for (int j = 0; j < contents.size(); j++) {
                                 JsonObject contentObj = contents.get(j).getAsJsonObject();
                                 String type = contentObj.has("type") ? contentObj.get("type").getAsString() : "";
-                                if ("output_text".equals(type)) {
+                                if ("output_text".equals(type) && textContent == null) {
                                     textContent = contentObj.get("text").getAsString();
-                                } else if ("thought".equals(type) || "reasoning".equals(type)) {
+                                } else if (("thought".equals(type) || "reasoning".equals(type)) && thoughtContent == null) {
                                     thoughtContent = contentObj.get("text").getAsString();
                                 }
                             }
+                        }
+                    } else if ("reasoning".equals(itemType) && thoughtContent == null) {
+                        if (item.has("summary")) {
+                            if (item.get("summary").isJsonArray()) {
+                                JsonArray summaryArray = item.getAsJsonArray("summary");
+                                StringBuilder sb = new StringBuilder();
+                                for (int j = 0; j < summaryArray.size(); j++) {
+                                    JsonObject summaryObj = summaryArray.get(j).getAsJsonObject();
+                                    if (summaryObj.has("text") && !summaryObj.get("text").isJsonNull()) {
+                                        if (sb.length() > 0) sb.append("\n");
+                                        sb.append(summaryObj.get("text").getAsString());
+                                    }
+                                }
+                                if (sb.length() > 0) thoughtContent = sb.toString();
+                            } else if (item.get("summary").isJsonPrimitive()) {
+                                thoughtContent = item.get("summary").getAsString();
+                            }
+                        }
+                        if (thoughtContent == null && item.has("content") && item.get("content").isJsonArray()) {
+                            JsonArray contents = item.getAsJsonArray("content");
+                            StringBuilder sb = new StringBuilder();
+                            for (int j = 0; j < contents.size(); j++) {
+                                JsonObject contentObj = contents.get(j).getAsJsonObject();
+                                String type = contentObj.has("type") ? contentObj.get("type").getAsString() : "";
+                                if ("reasoning_text".equals(type) && contentObj.has("text") && !contentObj.get("text").isJsonNull()) {
+                                    if (sb.length() > 0) sb.append("\n");
+                                    sb.append(contentObj.get("text").getAsString());
+                                }
+                            }
+                            if (sb.length() > 0) thoughtContent = sb.toString();
                         }
                     }
                 }
             }
 
             // 3. 尝试解析 Cloudflare 原生 result 格式
-            if (textContent == null && responseJson.has("result")) {
+            if (responseJson.has("result")) {
                 JsonObject result = responseJson.getAsJsonObject("result");
-                if (result.has("response")) textContent = result.get("response").getAsString();
-                else if (result.has("text")) textContent = result.get("text").getAsString();
+                if (textContent == null) {
+                    if (result.has("response")) textContent = result.get("response").getAsString();
+                    else if (result.has("text")) textContent = result.get("text").getAsString();
+                }
 
                 if (thoughtContent == null) {
                     if (result.has("reasoning")) thoughtContent = result.get("reasoning").getAsString();
@@ -403,8 +481,6 @@ public class CloudFlareAI {
             }
 
             if (textContent != null) {
-                // 如果思考内容为空，但在正文中包含 <thought> 标签，我们不在这里处理，交给 CLIManager 处理
-                // 但为了确保按钮能显示，我们记录一下日志
                 if (thoughtContent != null) {
                     plugin.getLogger().info("[AI] Detected thought content in API field (length: " + thoughtContent.length() + ")");
                 } else if (textContent.contains("<thought>")) {
