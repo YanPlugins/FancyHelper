@@ -756,7 +756,7 @@ public class CLIManager {
         String toolCall = "";
         
         // 定义已知工具列表
-        List<String> knownTools = Arrays.asList("#over", "#exit", "#run", "#get", "#choose", "#search", "#ls", "#read", "#diff");
+        List<String> knownTools = Arrays.asList("#over", "#exit", "#run", "#getpreset", "#choose", "#search", "#ls", "#read", "#diff");
         
         int currentPos = 0;
         boolean foundTool = false;
@@ -764,18 +764,17 @@ public class CLIManager {
             int hashIndex = cleanResponse.indexOf("#", currentPos);
             if (hashIndex == -1) break;
 
-            // 检查是否为行首调用（前面只有空白字符或处于开头）
-            boolean isAtLineStart = true;
-            for (int i = hashIndex - 1; i >= 0; i--) {
-                char c = cleanResponse.charAt(i);
-                if (c == '\n' || c == '\r') break;
-                if (!Character.isWhitespace(c)) {
-                    isAtLineStart = false;
-                    break;
+            // 检查是否为有效的工具调用起始位置
+            // 为了增加鲁棒性，不再强制要求必须在行首，但要求前面不能是字母或数字（防止误触发，如 CSS#id）
+            boolean isValidStart = true;
+            if (hashIndex > 0) {
+                char prev = cleanResponse.charAt(hashIndex - 1);
+                if (Character.isLetterOrDigit(prev)) {
+                    isValidStart = false;
                 }
             }
 
-            if (isAtLineStart) {
+            if (isValidStart) {
                 String potentialToolPart = cleanResponse.substring(hashIndex).trim();
                 for (String tool : knownTools) {
                     if (potentialToolPart.toLowerCase().startsWith(tool)) {
@@ -982,7 +981,7 @@ public class CLIManager {
             case "#diff":
                 handleFileTool(player, "diff", args);
                 break;
-            case "#get":
+            case "#getpreset":
                 handleGetTool(player, args);
                 break;
             case "#choose":
@@ -1771,31 +1770,34 @@ public class CLIManager {
             }
         }
 
-        // 处理代码块 ```...```
-        String[] codeParts = content.split("```");
-        TextComponent finalMessage = new TextComponent(ChatColor.WHITE + "◆ ");
-        
-        for (int i = 0; i < codeParts.length; i++) {
-            if (i % 2 == 1) {
-                // 代码块部分，亮蓝色显示
-                finalMessage.addExtra(ChatColor.AQUA + codeParts[i]);
-            } else {
-                // 普通文本部分，进一步处理 **...** 高亮
-                String text = codeParts[i];
-                String[] highlightParts = text.split("\\*\\*");
-                
-                for (int j = 0; j < highlightParts.length; j++) {
-                    if (j % 2 == 1) {
-                        // 高亮部分，亮蓝色显示
-                        finalMessage.addExtra(ChatColor.AQUA + highlightParts[j]);
-                    } else {
-                        // 普通部分，白色显示
-                        finalMessage.addExtra(ChatColor.WHITE + highlightParts[j]);
+        // 处理正文内容
+        if (content != null && !content.trim().isEmpty()) {
+            // 处理代码块 ```...```
+            String[] codeParts = content.split("```");
+            TextComponent finalMessage = new TextComponent(ChatColor.WHITE + "◆ ");
+            
+            for (int i = 0; i < codeParts.length; i++) {
+                if (i % 2 == 1) {
+                    // 代码块部分，亮蓝色显示
+                    finalMessage.addExtra(ChatColor.AQUA + codeParts[i]);
+                } else {
+                    // 普通文本部分，进一步处理 **...** 高亮
+                    String text = codeParts[i];
+                    String[] highlightParts = text.split("\\*\\*");
+                    
+                    for (int j = 0; j < highlightParts.length; j++) {
+                        if (j % 2 == 1) {
+                            // 高亮部分，亮蓝色显示
+                            finalMessage.addExtra(ChatColor.AQUA + highlightParts[j]);
+                        } else {
+                            // 普通部分，白色显示
+                            finalMessage.addExtra(ChatColor.WHITE + highlightParts[j]);
+                        }
                     }
                 }
             }
+            player.spigot().sendMessage(finalMessage);
         }
-        player.spigot().sendMessage(finalMessage);
     }
 
     /**

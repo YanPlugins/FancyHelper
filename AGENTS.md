@@ -187,7 +187,7 @@ AI 可以通过以下工具与服务器交互：
 - `#ls:<path>` - 列出目录内容
 - `#read:<file>` - 读取文件内容
 - `#diff:<file>|<old_content>|<new_content>` - 修改文件
-- `#get:<url>` - 获取网络资源
+- `#getpreset:<file>` - 获取插件预设内容
 - `#choose:<options>` - 让玩家做出选择
 - `#over` - 结束当前响应
 - `#exit` - 退出 CLI 模式
