@@ -8,6 +8,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class ConfigManager {
@@ -231,6 +232,10 @@ public class ConfigManager {
      */
     public int getAntiLoopMaxChainCount() {
         return config.getInt("settings.anti_loop.max_chain_count", 10);
+    }
+
+    public List<String> getYoloRiskCommands() {
+        return config.getStringList("settings.yolo_risk_commands");
     }
 
     public boolean isToolEnabled(String tool) {
