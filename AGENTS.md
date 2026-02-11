@@ -10,9 +10,12 @@ FancyHelper 是一款基于 AI 驱动的 Minecraft 服务器管理助手插件�
 - **多 AI 提供商支持**: 支持 CloudFlare Workers AI 和 OpenAI 兼容 API（OpenAI 官方、Azure OpenAI、DeepSeek、Ollama 等）
 - **AI 驱动**: 接入 CloudFlare Workers AI，默认使用 `gpt-oss-120b` 模型，支持推理模型参数
 - **安全执行**: AI 生成的指令需要玩家手动确认后才会执行（YOLO 模式除外）
+- **YOLO 风险保护**: YOLO 模式下对高风险命令仍要求手动确认（如 op、ban、stop 等）
 - **智能文档搜索**: 内置多种主流插件预设（LuckPerms, EssentialsX, WorldEdit 等）
 - **结果反馈闭环**: 指令执行结果会自动反馈给 AI，支持错误修正
-- **配置自愈**: 支持配置文件版本检测与自动更新
+- **配置自愈**: 支持配置文件版本检测与自动更新，保留用户自定义配置
+- **旧插件清理**: 自动清理旧版本的 MineAgent 插件文件，防止干扰
+- **自动修复安全配置**: 自动检测并修复 `enforce-secure-profile` 配置问题
 - **状态可视化**: 实时显示 AI 生成状态（思考中、执行工具、等待确认等）
 - **动作栏反馈**: 使用动作栏显示实时状态，不影响聊天体验
 - **精确 Token 计算**: 使用 jtokkit 实现精确的 token 消耗计算
@@ -100,8 +103,9 @@ mvn clean package
 1. 将 `FancyHelper.jar` 放入服务器的 `plugins` 文件夹
 2. 推荐安装 ProtocolLib 插件以获得完整功能（动作栏状态显示、命令输出捕获等）
 3. 重启服务器以生成默认配置文件
-4. 编辑 `plugins/FancyHelper/config.yml` 配置 CloudFlare API 密钥（插件会自动获取 account-id）
-5. 在游戏中使用 `/fancyhelper` 或 `/cli` 进入对话模式
+4. 插件会自动清理旧版本的 MineAgent 插件文件（如有），并将移动到 `plugins/FancyHelper/old/` 目录
+5. 编辑 `plugins/FancyHelper/config.yml` 配置 CloudFlare API 密钥（插件会自动获取 account-id）
+6. 在游戏中使用 `/fancyhelper` 或 `/cli` 进入对话模式
 
 ### 重新加载配置
 
@@ -159,6 +163,12 @@ mvn clean package
 - `y` / `n` - 确认或取消执行命令
 - `agree` - 同意用户协议或 YOLO 协议
 - `/cli exempt_anti_loop` - 豁免当前会话的防循环检测（通过聊天按钮触发）
+
+**YOLO 模式说明**：
+- YOLO（You Only Live Once）模式下，大部分 AI 生成的指令会自动执行，无需确认
+- 但对于高风险命令（如 op、ban、stop、reload 等），仍需玩家手动确认
+- 风险命令列表可在 `config.yml` 的 `settings.yolo_risk_commands` 中配置
+- 默认包含：op、deop、stop、reload、restart、kill、nbt、ban
 
 ### 状态显示
 
@@ -243,14 +253,14 @@ Minecraft 在 1.20.5 版本对物品数据进行了重大重构：
 
 ```yaml
 # 配置版本，请勿修改
-version: 2.6.0
+version: 3.0.0
 
 # CloudFlare Workers AI 配置
 cloudflare:
-  # CloudFlare Workers AI API 密钥，插件会自动获取对应的 account-id
+  # CloudFlare Workers AI API 密钥，FancyHelper会自动根据密钥来获取对应的account-id
   cf_key: "你的_CLOUDFLARE_API_KEY"
 
-  # 使用的模型名称，默认 gpt-oss-120b
+  # 使用的模型名称，不推荐更改，可以是任何一个Text-Generation模型，默认gpt-oss-120b（最聪明）
   model: "@cf/openai/gpt-oss-120b"
 
 # OpenAI 兼容 API 配置（支持自定义 OpenAI 接口）
@@ -258,7 +268,7 @@ openai:
   # 是否启用 OpenAI 模式（启用后将优先使用此配置）
   enabled: false
 
-  # OpenAI API 地址（支持自定义地址）
+  # OpenAI API 地址（支持自定义地址，如 OpenAI 官方、Azure OpenAI、本地模型等）
   api_url: "https://api.openai.com/v1/chat/completions"
 
   # OpenAI API 密钥
@@ -266,35 +276,21 @@ openai:
 
   # 使用的模型名称
   model: "gpt-4o"
-```
-
-**settings 节点包含以下配置：**
-
-- `timeout_minutes`: CLI 模式会话的自动过期时间（分钟）
-- `token_warning_threshold`: Token 剩余警告阈值
-- `auto_report`: 是否启用匿名错误上报
-- `check_update`: 是否启用自动更新检查
-- `op_update_notify`: 是否在管理员进入服务器时提示更新
-- `auto_upgrade`: 是否自动下载并安装更新
-- `update_mirror`: GitHub 镜像源
-- `anti_loop`: 防死循环检测配置
-  - `threshold_count`: 连续相似调用触发中断的次数
-  - `similarity_threshold`: 相似度阈值 (0.0 - 1.0)
-  - `max_chain_count`: 单次对话中连续调用工具的最大次数
-- `api_timeout_seconds`: **AI API 请求超时时间（秒）**
-  - 对于推理模型（如 `gpt-oss-120b`、`deepseek-reasoner`、`o1` 等），建议设置为 **180-300 秒**
-  - 对于普通模型（如 `gpt-4o`、`gpt-4o-mini`），建议设置为 **60-120 秒**
-  - 默认值为 120 秒
 
 # 插件设置
 settings:
   # CLI 模式会话的自动过期时间（以分钟为单位）
   timeout_minutes: 10
 
+  # AI API 请求超时时间（以秒为单位）
+  # 对于推理模型（如 gpt-oss-120b、deepseek-reasoner、o1 等），建议设置为 120-300 秒
+  # 对于普通模型（如 gpt-4o、gpt-4o-mini），建议设置为 60-120 秒
+  api_timeout_seconds: 120
+
   # Token（字符数）剩余警告阈值
   token_warning_threshold: 100
 
-  # 是否启用匿名错误上报
+  # 是否启用匿名错误上报，帮助开发者改进插件
   auto_report: true
 
   # 是否启用自动更新检查
@@ -315,9 +311,39 @@ settings:
     threshold_count: 4
     # 相似度阈值 (0.0 - 1.0)，建议 0.95
     similarity_threshold: 0.95
-    # 单次对话中连续调用工具的最大次数
+    # 单次对话中连续调用工具的最大次数（防止 AI 陷入逻辑循环或过度消耗）
     max_chain_count: 30
+
+  # YOLO 模式下需要手动确认的风险命令列表（匹配前缀）
+  yolo_risk_commands:
+    - op
+    - deop
+    - stop
+    - reload
+    - restart
+    - kill
+    - nbt
+    - ban
 ```
+
+**settings 节点包含以下配置：**
+
+- `timeout_minutes`: CLI 模式会话的自动过期时间（分钟）
+- `api_timeout_seconds`: AI API 请求超时时间（秒）
+  - 对于推理模型（如 `gpt-oss-120b`、`deepseek-reasoner`、`o1` 等），建议设置为 **120-300 秒**
+  - 对于普通模型（如 `gpt-4o`、`gpt-4o-mini`），建议设置为 **60-120 秒**
+  - 默认值为 120 秒
+- `token_warning_threshold`: Token 剩余警告阈值
+- `auto_report`: 是否启用匿名错误上报
+- `check_update`: 是否启用自动更新检查
+- `op_update_notify`: 是否在管理员进入服务器时提示更新
+- `auto_upgrade`: 是否自动下载并安装更新
+- `update_mirror`: GitHub 镜像源
+- `anti_loop`: 防死循环检测配置
+  - `threshold_count`: 连续相似调用触发中断的次数
+  - `similarity_threshold`: 相似度阈值 (0.0 - 1.0)
+  - `max_chain_count`: 单次对话中连续调用工具的最大次数
+- `yolo_risk_commands`: YOLO 模式下需要手动确认的风险命令列表（匹配前缀）
 
 ### OpenAI 兼容 API 配置
 
@@ -413,11 +439,24 @@ FancyHelper 支持 ProtocolLib 作为可选依赖，用于以下功能：
 
 ### 安全聊天警告
 
-如果出现 "Failed to update secure chat state" 警告，这是由于服务器的 `enforce-secure-profile` 设置引起的。插件会自动尝试禁用该功能，或者手动修改 `server.properties`：
+如果出现 "Failed to update secure chat state" 警告，这是由于服务器的 `enforce-secure-profile` 设置引起的。
+
+**自动修复**：插件会自动检测此问题并尝试将 `server.properties` 中的 `enforce-secure-profile` 设置为 `false`。如果自动修改成功，只需重启服务器即可。
+
+**手动修复**：如果自动修改失败，请手动修改 `server.properties`：
 
 ```properties
 enforce-secure-profile=false
 ```
+
+### 旧插件清理
+
+插件启动时会自动清理旧版本的 MineAgent 插件文件（文件名包含 "mineagent" 关键词），并将移动到 `plugins/FancyHelper/old/` 目录，防止干扰。
+
+**注意事项**：
+- 插件只会移动包含 "mineagent" 关键词的文件/文件夹
+- 不会删除任何文件，只是移动到 old 目录
+- 如果移动失败，会在日志中显示警告
 
 ### 状态显示异常
 
@@ -428,7 +467,19 @@ enforce-secure-profile=false
 
 ### 配置文件更新
 
-插件升级时会自动检测配置版本，保留用户自定义配置并更新新增选项。
+插件升级时会自动检测配置版本，执行以下更新流程：
+
+1. **备份旧配置**：将现有的 `config.yml` 备份为 `config.yml.old`
+2. **释放新配置**：删除旧配置文件，释放最新的默认配置
+3. **迁移用户配置**：将用户自定义的配置项迁移到新配置文件中
+4. **移动备份文件**：将 `config.yml.old` 移动到 `plugins/FancyHelper/old/` 目录
+5. **更新预设文件**：自动更新 `preset/` 目录中的预设文件
+
+**注意事项**：
+- 插件会自动保留用户的自定义配置
+- 只有存在于新配置文件中的配置项才会被迁移
+- 旧配置文件会保留在 `plugins/FancyHelper/old/` 目录中
+- 版本更新时还会强制更新 EULA 和 License 文件
 
 ### 防循环检测过于敏感
 
@@ -451,6 +502,39 @@ enforce-secure-profile=false
 - `style:` 代码风格调整
 - `docs:` 文档更新
 - `chore:` 构建/工具更新
+
+示例：
+```
+feat(CLI): 添加生成状态可视化与实时反馈
+fix(CLIManager): 添加错误状态处理并修复异常状态显示
+fix(CLI): 将状态显示从副标题改为动作栏并修复计时器问题
+feat(防循环): 添加防死循环检测机制
+style(CLIManager): 修正 YOLO 模式消息发送行的缩进
+```
+
+### bStats 统计
+
+插件使用 bstats 进行匿名统计，帮助开发者了解插件使用情况：
+- bStats pluginId: 29036
+- 统计数据包括：服务器版本、插件版本、玩家数量等
+- 不收集任何敏感信息
+- 可在 `config.yml` 的 `settings.auto_report` 中禁用
+
+### 旧插件清理
+
+插件启动时会自动清理旧版本的 MineAgent 插件文件：
+- 通过 `cleanOldPluginFiles()` 方法实现
+- 检测文件名是否包含 "mineagent" 关键词
+- 将符合条件的文件移动到 `plugins/FancyHelper/old/` 目录
+- 不会删除任何文件，只进行移动操作
+
+### 自动修复安全配置
+
+插件启动时会自动检测 `enforce-secure-profile` 配置：
+- 通过反射调用 `shouldEnforceSecureProfile()` 方法
+- 如果启用，自动修改 `server.properties` 文件
+- 将 `enforce-secure-profile` 设置为 `false`
+- 在日志中显示详细的操作结果
 
 示例：
 ```
@@ -490,4 +574,4 @@ style(CLIManager): 修正 YOLO 模式消息发送行的缩进
 
 ## 许可证
 
-© 2026 baicaizhale. 保留所有权利。
+© 2026 baicaizhale, zip8919. 保留所有权利。
