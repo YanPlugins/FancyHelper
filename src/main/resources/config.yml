@@ -44,3 +44,14 @@ settings:
     similarity_threshold: 0.95
     # 单次对话中连续调用工具的最大次数 (防止 AI 陷入逻辑循环或过度消耗)
     max_chain_count: 30
+  
+  # YOLO 模式下需要手动确认的风险命令列表（匹配前缀）
+  yolo_risk_commands:
+    - op
+    - deop
+    - stop
+    - reload
+    - restart
+    - kill
+    - nbt
+    - ban

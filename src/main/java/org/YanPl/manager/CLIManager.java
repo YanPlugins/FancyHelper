@@ -1010,18 +1010,42 @@ public class CLIManager {
         // 自动过滤掉领先的斜杠 /
         String cleanCommand = command.startsWith("/") ? command.substring(1) : command;
 
-        // 如果是 YOLO 模式，直接执行
+        // 如果是 YOLO 模式，风险命令需要确认
         if (session != null && session.getMode() == DialogueSession.Mode.YOLO) {
-            player.sendMessage(ChatColor.GOLD + "⇒ YOLO RUN " + ChatColor.WHITE + cleanCommand);
-            generationStates.put(uuid, GenerationStatus.EXECUTING_TOOL);
-            executeCommand(player, cleanCommand);
-            return;
+            if (isRiskyCommand(cleanCommand)) {
+                player.sendMessage(ChatColor.YELLOW + "⨀ 检测到风险命令，已暂停，请确认");
+                pendingCommands.put(uuid, cleanCommand);
+                generationStates.put(uuid, GenerationStatus.WAITING_CONFIRM);
+                sendConfirmButtons(player, cleanCommand);
+                return;
+            } else {
+                player.sendMessage(ChatColor.GOLD + "⇒ YOLO RUN " + ChatColor.WHITE + cleanCommand);
+                generationStates.put(uuid, GenerationStatus.EXECUTING_TOOL);
+                executeCommand(player, cleanCommand);
+                return;
+            }
         }
         
         pendingCommands.put(uuid, cleanCommand);
         generationStates.put(uuid, GenerationStatus.WAITING_CONFIRM);
 
         sendConfirmButtons(player, cleanCommand);
+    }
+
+    private boolean isRiskyCommand(String cmd) {
+        java.util.List<String> risky = plugin.getConfigManager().getYoloRiskCommands();
+        if (risky == null || risky.isEmpty()) return false;
+        String lc = cmd.toLowerCase();
+        for (String r : risky) {
+            if (r == null) continue;
+            String rr = r.trim().toLowerCase();
+            if (rr.isEmpty()) continue;
+            if (lc.startsWith(rr)) return true;
+            int spaceIdx = lc.indexOf(' ');
+            String first = spaceIdx >= 0 ? lc.substring(0, spaceIdx) : lc;
+            if (first.equals(rr)) return true;
+        }
+        return false;
     }
 
     private void handleFileTool(Player player, String type, String args) {
