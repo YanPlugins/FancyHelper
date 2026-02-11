@@ -947,7 +947,15 @@ public class CLIManager {
         } else if (lowerToolName.equals("#read")) {
             player.sendMessage(ChatColor.GRAY + "〇 正在读取文件: " + ChatColor.WHITE + args);
         } else if (lowerToolName.equals("#diff")) {
-            player.sendMessage(ChatColor.GRAY + "〇 正在修改文件: " + ChatColor.WHITE + args.split("\\|")[0].trim());
+            String[] parts = args.split("\\|", 3);
+            String path = parts.length > 0 ? parts[0].trim() : "";
+            player.sendMessage(ChatColor.GRAY + "〇 正在修改文件: " + ChatColor.WHITE + path);
+            if (parts.length >= 3) {
+                String from = parts[1];
+                String to = parts[2];
+                player.sendMessage(ChatColor.GRAY + "From " + ChatColor.WHITE + from);
+                player.sendMessage(ChatColor.GRAY + "To " + ChatColor.WHITE + to);
+            }
         } else if (lowerToolName.equals("#exit")) {
             player.sendMessage(ChatColor.GRAY + "〇 Exiting...");
         }
