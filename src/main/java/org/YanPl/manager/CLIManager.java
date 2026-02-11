@@ -756,7 +756,7 @@ public class CLIManager {
         String toolCall = "";
         
         // 定义已知工具列表
-        List<String> knownTools = Arrays.asList("#over", "#exit", "#run", "#get", "#choose", "#search", "#ls", "#read", "#diff");
+        List<String> knownTools = Arrays.asList("#over", "#exit", "#run", "#getpreset", "#choose", "#search", "#ls", "#read", "#diff");
         
         int currentPos = 0;
         boolean foundTool = false;
@@ -981,7 +981,7 @@ public class CLIManager {
             case "#diff":
                 handleFileTool(player, "diff", args);
                 break;
-            case "#get":
+            case "#getpreset":
                 handleGetTool(player, args);
                 break;
             case "#choose":
