@@ -40,6 +40,7 @@ public class CLIManager {
     private final Map<UUID, GenerationStatus> generationStates = new ConcurrentHashMap<>();
     private final Map<UUID, Long> generationStartTimes = new ConcurrentHashMap<>();
     private final Map<UUID, String> pendingCommands = new ConcurrentHashMap<>();
+    private final Map<UUID, String> interruptedToolCalls = new ConcurrentHashMap<>();
 
     public enum GenerationStatus {
         THINKING,
@@ -564,6 +565,7 @@ public class CLIManager {
             }
             if (message.equalsIgnoreCase("stop")) {
                 boolean interrupted = false;
+                interruptedToolCalls.remove(uuid);
                 if (isGenerating.getOrDefault(uuid, false)) {
                     isGenerating.put(uuid, false);
                     generationStates.put(uuid, GenerationStatus.CANCELLED);
@@ -589,7 +591,17 @@ public class CLIManager {
                 DialogueSession session = sessions.get(uuid);
                 if (session != null) {
                     session.setAntiLoopExempted(true);
-                    player.sendMessage(ChatColor.GREEN + "✔ 已为本次对话开启豁免模式，Fancy 将不再被自动打断。");
+                    player.sendMessage(ChatColor.WHITE + "✔ 已为本次对话开启豁免模式，Fancy 将不再被自动打断。");
+                    
+                    // 恢复执行之前被打断的工具
+                    String interruptedCall = interruptedToolCalls.get(uuid);
+                    if (interruptedCall != null) {
+                        player.sendMessage(ChatColor.GRAY + "⇒ 正在恢复执行之前被打断的操作...");
+                        isGenerating.put(uuid, true);
+                        generationStates.put(uuid, GenerationStatus.EXECUTING_TOOL);
+                        generationStartTimes.put(uuid, System.currentTimeMillis());
+                        executeTool(player, interruptedCall);
+                    }
                 }
                 return true;
             }
@@ -634,6 +646,7 @@ public class CLIManager {
 
     private void processAIMessage(Player player, String message) {
         UUID uuid = player.getUniqueId();
+        interruptedToolCalls.remove(uuid);
         DialogueSession session = sessions.get(uuid);
         if (session == null) return;
 
@@ -851,6 +864,7 @@ public class CLIManager {
                     exemptMsg.addExtra(btn);
                     player.spigot().sendMessage(exemptMsg);
                     
+                    interruptedToolCalls.put(uuid, toolCall);
                     isGenerating.put(uuid, false);
                     generationStates.put(uuid, GenerationStatus.CANCELLED);
                     generationStartTimes.remove(uuid);
@@ -878,6 +892,7 @@ public class CLIManager {
                 exemptMsg.addExtra(btn);
                 player.spigot().sendMessage(exemptMsg);
                 
+                interruptedToolCalls.put(uuid, toolCall);
                 isGenerating.put(uuid, false);
                 generationStates.put(uuid, GenerationStatus.COMPLETED);
                 generationStartTimes.remove(uuid);
@@ -889,6 +904,9 @@ public class CLIManager {
             session.addToolCall(toolCall);
         }
         // --- 检测逻辑结束 ---
+
+        // 如果该工具之前被中断过且现在继续执行，清除记录
+        interruptedToolCalls.remove(uuid);
 
         boolean toolSuccess = true;
 
