@@ -238,8 +238,8 @@ public class CloudFlareAI {
         bodyJson.add("messages", messagesArray);
         bodyJson.addProperty("max_tokens", 4096);
 
-        // 对于支持推理参数的模型（如 deepseek-reasoner、o1 等），添加推理参数
-        if (model.contains("reasoner") || model.contains("o1") || model.contains("deepseek-reasoner")) {
+        // 对于支持推理参数的模型（如 deepseek-reasoner、o1、qwen-max 等），添加推理参数
+        if (model.contains("reasoner") || model.contains("o1") || model.contains("deepseek") || model.contains("qwen")) {
             bodyJson.addProperty("reasoning_effort", "medium");
         }
 
@@ -258,6 +258,12 @@ public class CloudFlareAI {
             HttpResponse<String> response = sendWithRetry(request);
             String responseBody = response.body();
             plugin.getLogger().info("[AI 响应] 状态码: " + response.statusCode());
+            
+            // 调试日志：输出响应体前 500 个字符
+            if (responseBody != null) {
+                String debugBody = responseBody.length() > 500 ? responseBody.substring(0, 500) + "..." : responseBody;
+                plugin.getLogger().info("[AI 调试] 响应体内容: " + debugBody);
+            }
 
             if (response.statusCode() != 200) {
                 plugin.getLogger().warning("[AI 错误] 响应体: " + responseBody);
@@ -278,16 +284,38 @@ public class CloudFlareAI {
                         if (message.has("content") && !message.get("content").isJsonNull()) {
                             textContent = message.get("content").getAsString();
                         }
-                        // 某些模型在 reasoning_content 中返回思考过程
+                        
+                        // 兼容多种思考内容字段名 (OpenAI/DeepSeek/Qwen 等)
                         if (message.has("reasoning_content") && !message.get("reasoning_content").isJsonNull()) {
                             thoughtContent = message.get("reasoning_content").getAsString();
+                        } else if (message.has("reasoning") && !message.get("reasoning").isJsonNull()) {
+                            thoughtContent = message.get("reasoning").getAsString();
+                        } else if (message.has("thought") && !message.get("thought").isJsonNull()) {
+                            thoughtContent = message.get("thought").getAsString();
+                        }
+                    }
+                    
+                    // 某些 API 可能将 reasoning 放在 choice 级别而非 message 级别
+                    if (thoughtContent == null) {
+                        if (choice.has("reasoning_content") && !choice.get("reasoning_content").isJsonNull()) {
+                            thoughtContent = choice.get("reasoning_content").getAsString();
+                        } else if (choice.has("reasoning") && !choice.get("reasoning").isJsonNull()) {
+                            thoughtContent = choice.get("reasoning").getAsString();
                         }
                     }
                 }
             }
 
+            // 如果 content 为空但存在思考内容或工具调用（此处主要针对正文缺失的情况）
+            if (textContent == null || textContent.trim().isEmpty()) {
+                // 如果有思考内容，尝试将其作为响应的一部分返回，或者至少返回一个空字符串避免报错
+                if (thoughtContent != null && !thoughtContent.isEmpty()) {
+                    textContent = ""; // 允许空正文，只要有思考过程
+                }
+            }
+
             if (textContent != null) {
-                if (thoughtContent != null) {
+                if (thoughtContent != null && !thoughtContent.isEmpty()) {
                     plugin.getLogger().info("[AI] 检测到思考内容 (长度: " + thoughtContent.length() + ")");
                 }
                 return new AIResponse(textContent, thoughtContent);
