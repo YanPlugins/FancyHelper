@@ -267,6 +267,21 @@ public class CLIManager {
     }
 
     /**
+     * 停止当前的思考计时并记录时长
+     */
+    private void recordThinkingTime(UUID uuid) {
+        DialogueSession session = sessions.get(uuid);
+        if (session == null) return;
+
+        Long startTime = generationStartTimes.get(uuid);
+        GenerationStatus status = generationStates.get(uuid);
+
+        if (startTime != null && status == GenerationStatus.THINKING) {
+            session.addThinkingTime(System.currentTimeMillis() - startTime);
+        }
+    }
+
+    /**
      * 向玩家发送状态消息（根据玩家配置选择 Actionbar 或 Subtitle）
      */
     private void sendStatusMessage(Player player, String message) {
@@ -440,6 +455,7 @@ public class CLIManager {
             player.sendMessage(ChatColor.GRAY + "⇒ 已取消待处理的操作");
         }
 
+        recordThinkingTime(uuid);
         sendExitMessage(player);
         activeCLIPayers.remove(uuid);
         pendingAgreementPlayers.remove(uuid);
@@ -600,6 +616,7 @@ public class CLIManager {
                 interruptedToolCalls.remove(uuid);
                 if (isGenerating.getOrDefault(uuid, false)) {
                     isGenerating.put(uuid, false);
+                    recordThinkingTime(uuid);
                     generationStates.put(uuid, GenerationStatus.CANCELLED);
                     generationStartTimes.put(uuid, System.currentTimeMillis());
                     player.sendMessage(ChatColor.YELLOW + "⇒ 已打断 Fancy 生成");
@@ -703,6 +720,7 @@ public class CLIManager {
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     player.sendMessage(ChatColor.RED + "AI 调用出错: " + e.getMessage());
                     isGenerating.put(uuid, false);
+                    recordThinkingTime(uuid);
                     generationStates.put(uuid, GenerationStatus.ERROR);
                     generationStartTimes.remove(uuid);
                     // 立即清除动作栏
@@ -715,6 +733,7 @@ public class CLIManager {
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     player.sendMessage(ChatColor.RED + "系统内部错误: " + t.getMessage());
                     isGenerating.put(uuid, false);
+                    recordThinkingTime(uuid);
                     generationStates.put(uuid, GenerationStatus.ERROR);
                     generationStartTimes.remove(uuid);
                     // 立即清除动作栏
@@ -730,6 +749,7 @@ public class CLIManager {
         if (session == null) return;
 
         // 收到 AI 回复，立即停止计时
+        recordThinkingTime(uuid);
         generationStates.put(uuid, GenerationStatus.COMPLETED);
         generationStartTimes.remove(uuid);
 
@@ -1718,6 +1738,7 @@ public class CLIManager {
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     player.sendMessage(ChatColor.RED + "AI 调用出错: " + e.getMessage());
                     isGenerating.put(uuid, false);
+                    recordThinkingTime(uuid);
                     generationStates.put(uuid, GenerationStatus.ERROR);
                     generationStartTimes.remove(uuid);
                     // 立即清除动作栏
@@ -1728,6 +1749,7 @@ public class CLIManager {
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     player.sendMessage(ChatColor.RED + "系统内部错误: " + t.getMessage());
                     isGenerating.put(uuid, false);
+                    recordThinkingTime(uuid);
                     generationStates.put(uuid, GenerationStatus.ERROR);
                     generationStartTimes.remove(uuid);
                     // 立即清除动作栏
@@ -1958,11 +1980,14 @@ public class CLIManager {
         int thoughtTokens = session != null ? session.getThoughtTokens() : 0;
         long durationMs = session != null ? System.currentTimeMillis() - session.getStartTime() : 0;
         double durationSec = durationMs / 1000.0;
+        
+        // 获取思考总时长
+        double thinkingSec = session != null ? session.getTotalThinkingTimeMs() / 1000.0 : 0.0;
 
         player.sendMessage(ChatColor.GRAY + "==================");
         player.sendMessage("");
         player.sendMessage(ChatColor.WHITE + "已退出 FancyHelper");
-        player.sendMessage(ChatColor.GRAY + "消耗 Token: " + (tokens + thoughtTokens) + "  | 时长: " + String.format("%.1f", durationSec) + " 秒");
+        player.sendMessage(ChatColor.GRAY + "消耗 Token: " + (tokens + thoughtTokens) + "  | 时长: " + String.format("%.1f", durationSec) + " 秒 (思考: " + String.format("%.1f", thinkingSec) + " 秒)");
         player.sendMessage("");
         player.sendMessage(ChatColor.GRAY + "==================");
     }
