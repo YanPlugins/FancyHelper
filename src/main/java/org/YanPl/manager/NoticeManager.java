@@ -3,7 +3,6 @@ package org.YanPl.manager;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.md_5.bungee.api.chat.ClickEvent;
-import net.md_5.bungee.api.chat.ComponentBuilder;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.hover.content.Text;
@@ -95,9 +94,9 @@ public class NoticeManager {
             readPlayers.add(uuid);
             playerData.set("notice.read_players", readPlayers);
             plugin.getConfigManager().savePlayerData();
-            player.sendMessage("§a[FancyHelper] 公告已标记为已读。");
+            player.sendMessage("§bFancyHelper &7> &f已将公告标记为已读");
         } else {
-            player.sendMessage("§e[FancyHelper] 该公告你已经读过了。");
+            player.sendMessage("§bFancyHelper &7> &f该公告被你标记为已读");
         }
     }
 
@@ -178,7 +177,7 @@ public class NoticeManager {
     public void showNoticeToConsole(NoticeData noticeData) {
         if (noticeData != null && noticeData.enabled) {
             plugin.getLogger().info("========================================");
-            plugin.getLogger().info("【FancyHelper 公告】");
+            plugin.getLogger().info("【FancyHelper】");
             if (noticeData.text != null && !noticeData.text.isEmpty()) {
                 for (String line : noticeData.text.split("\\n")) {
                     plugin.getLogger().info(line);
