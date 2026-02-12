@@ -72,24 +72,37 @@ public class NoticeManager {
 
     /**
      * 显示公告到控制台
+     *
+     * @param noticeData 公告数据
      */
     public void showNoticeToConsole(NoticeData noticeData) {
         if (noticeData != null && noticeData.enabled) {
             plugin.getLogger().info("========================================");
             plugin.getLogger().info("【FancyHelper 公告】");
-            plugin.getLogger().info(noticeData.text);
+            if (noticeData.text != null && !noticeData.text.isEmpty()) {
+                for (String line : noticeData.text.split("\\n")) {
+                    plugin.getLogger().info(line);
+                }
+            }
             plugin.getLogger().info("========================================");
         }
     }
 
     /**
      * 显示公告给玩家
+     *
+     * @param player     玩家对象
+     * @param noticeData 公告数据
      */
     public void showNoticeToPlayer(org.bukkit.entity.Player player, NoticeData noticeData) {
         if (noticeData != null && noticeData.enabled && player.hasPermission("fancyhelper.notice")) {
             player.sendMessage("========================================");
             player.sendMessage("§e【FancyHelper 公告】");
-            player.sendMessage("§f" + noticeData.text);
+            if (noticeData.text != null && !noticeData.text.isEmpty()) {
+                for (String line : noticeData.text.split("\\n")) {
+                    player.sendMessage("§f" + line);
+                }
+            }
             player.sendMessage("========================================");
         }
     }
