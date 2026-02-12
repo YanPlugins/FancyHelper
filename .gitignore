@@ -98,6 +98,8 @@ $RECYCLE.BIN/
 *.lnk
 
 target/
+iflow/
+
 
 pom.xml.tag
 pom.xml.releaseBackup
