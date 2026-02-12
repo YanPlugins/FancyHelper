@@ -298,6 +298,17 @@ public class ConfigManager {
         savePlayerData();
     }
 
+    public String getPlayerDisplayPosition(org.bukkit.entity.Player player) {
+        String path = player.getUniqueId() + ".display_position";
+        return playerData.getString(path, "actionbar");
+    }
+
+    public void setPlayerDisplayPosition(org.bukkit.entity.Player player, String position) {
+        String path = player.getUniqueId() + ".display_position";
+        playerData.set(path, position);
+        savePlayerData();
+    }
+
     private void save() {
         try {
             config.save(new File(plugin.getDataFolder(), "config.yml"));
