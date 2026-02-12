@@ -81,6 +81,13 @@ public class CLICommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(ChatColor.GOLD + "[FancyHelper] " + ChatColor.YELLOW + "正在检查更新...");
                 plugin.getUpdateManager().checkForUpdates(sender instanceof Player ? (Player) sender : null);
                 break;
+            case "notice":
+                if (!sender.hasPermission("fancyhelper.notice")) {
+                    sender.sendMessage(ChatColor.RED + "你没有权限查看公告。");
+                    return true;
+                }
+                handleNotice(sender);
+                break;
             case "upgrade":
             case "download":
                 if (!sender.hasPermission("fancyhelper.reload")) {
@@ -119,7 +126,7 @@ public class CLICommand implements CommandExecutor, TabCompleter {
                 }
                 return true;
             default:
-                sender.sendMessage(ChatColor.RED + "未知子命令。用法: /fancy [reload|status]");
+                sender.sendMessage(ChatColor.RED + "未知子命令。用法: /fancy [reload|status|settings|notice]");
                 break;
         }
 
@@ -456,10 +463,27 @@ public class CLICommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    private void handleNotice(CommandSender sender) {
+        sender.sendMessage(ChatColor.GOLD + "[FancyHelper] " + ChatColor.YELLOW + "正在获取公告...");
+        
+        plugin.getNoticeManager().fetchNoticeAsync().thenAccept(noticeData -> {
+            if (noticeData == null || !noticeData.enabled) {
+                sender.sendMessage(ChatColor.GRAY + "[FancyHelper] 当前没有可显示的公告。");
+                return;
+            }
+            
+            if (sender instanceof Player) {
+                plugin.getNoticeManager().showNoticeToPlayer((Player) sender, noticeData);
+            } else {
+                plugin.getNoticeManager().showNoticeToConsole(noticeData);
+            }
+        });
+    }
+
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> subCommands = new ArrayList<>(Arrays.asList("reload", "status", "yolo", "normal", "checkupdate", "upgrade", "read", "set", "settings"));
+            List<String> subCommands = new ArrayList<>(Arrays.asList("reload", "status", "yolo", "normal", "checkupdate", "upgrade", "read", "set", "settings", "display", "toggle", "notice"));
             return subCommands.stream()
                     .filter(s -> s.startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());
