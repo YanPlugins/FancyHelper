@@ -49,13 +49,10 @@ public class CloudFlareAI {
      */
     private HttpResponse<String> sendWithRetry(HttpRequest request) throws IOException, InterruptedException {
         int maxRetries = 3;
-        IOException lastException = null;
-
         for (int i = 0; i < maxRetries; i++) {
             try {
                 return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             } catch (IOException e) {
-                lastException = e;
                 String errorMsg = e.getMessage();
                 // 常见的偶发性网络错误，值得重试
                 if (errorMsg != null && (errorMsg.contains("header parser received no bytes") || 
@@ -68,10 +65,11 @@ public class CloudFlareAI {
                         continue;
                     }
                 }
-                throw e;
+                throw e; // 达到最大重试次数或非偶发性错误，抛出异常
             }
         }
-        throw lastException;
+        // 理论上不会到达这里，除非 maxRetries <= 0
+        throw new IOException("请求失败：超过最大重试次数");
     }
 
     public void shutdown() {
