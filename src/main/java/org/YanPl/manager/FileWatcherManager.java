@@ -5,6 +5,8 @@ import org.bukkit.Bukkit;
 
 import java.io.IOException;
 import java.nio.file.*;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -15,6 +17,8 @@ public class FileWatcherManager {
     private WatchService watchService;
     private Thread watchThread;
     private final AtomicBoolean running = new AtomicBoolean(true);
+    private final Map<String, Long> lastProcessed = new HashMap<>();
+    private static final long DEBOUNCE_TIME = 3000; // 3秒防抖间隔
 
     public FileWatcherManager(FancyHelper plugin) {
         this.plugin = plugin;
@@ -68,6 +72,12 @@ public class FileWatcherManager {
     }
 
     private void handleFileChange(String fileName) {
+        long now = System.currentTimeMillis();
+        if (now - lastProcessed.getOrDefault(fileName, 0L) < DEBOUNCE_TIME) {
+            return;
+        }
+        lastProcessed.put(fileName, now);
+
         Bukkit.getScheduler().runTask(plugin, () -> {
             switch (fileName) {
                 case "config.yml":
