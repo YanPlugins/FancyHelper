@@ -100,7 +100,7 @@ public class PromptManager {
         
         // ==================== 使用指南 ====================
         sb.append("【使用指南】\n");
-        sb.append("1. **执行命令前**：如果不确定第三方插件（如 LuckPerms, EssentialsX, CoreProtect）的语法，**优先使用 #getpreset** 查看预设文件。若无匹配预设，使用 #search。\n");
+        sb.append("1. **优先查看预设**：如果问题有相关预设，那么优先查看预设。\n");
         sb.append("2. **处理复杂任务**：当需要 3 步及以上才能完成的任务时，使用 #todo 创建任务列表，让用户了解进度。\n");
         sb.append("3. **TODO 使用原则**：\n");
         sb.append("   - 应该使用：复杂多步骤任务、需要规划的任务、需要显示进度的任务\n");
