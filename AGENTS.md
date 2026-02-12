@@ -7,7 +7,7 @@ FancyHelper 是一款基于 AI 驱动的 Minecraft 服务器管理助手插件�
 ### 核心特性
 
 - **CLI 交互模式**: 通过游戏内聊天框与 AI 进行沉浸式对话
-- **多 AI 提供商支持**: 支持 CloudFlare Workers AI 和 OpenAI 兼容 API（OpenAI 官方、Azure OpenAI、DeepSeek、Ollama 等）
+- **多 AI 提供商支持**: 支持 CloudFlare Workers AI 和 OpenAI 兼容 API（OpenAI 官方、Azure OpenAI、DeepSeek、Ollama、阿里云通义千问等）
 - **AI 驱动**: 接入 CloudFlare Workers AI，默认使用 `gpt-oss-120b` 模型，支持推理模型参数
 - **安全执行**: AI 生成的指令需要玩家手动确认后才会执行（YOLO 模式除外）
 - **YOLO 风险保护**: YOLO 模式下对高风险命令仍要求手动确认（如 op、ban、stop 等）
@@ -21,6 +21,10 @@ FancyHelper 是一款基于 AI 驱动的 Minecraft 服务器管理助手插件�
 - **精确 Token 计算**: 使用 jtokkit 实现精确的 token 消耗计算
 - **防死循环检测**: 自动检测 AI 陷入重复操作或过度调用，支持豁免机制
 - **NBT/组件格式指南**: 内置 NBT 与数据组件格式转换指南，适配 1.20.5+ 版本
+- **调试模式**: 支持调试模式，启用后在控制台输出详细调试信息
+- **自动状态清理**: 玩家退出时自动清理 CLI 会话状态，避免资源泄漏
+- **公告系统**: 支持从远程获取并显示公告，可在控制台和玩家聊天中查看
+- **总思考时间记录**: 在对话会话中记录并显示总思考时间
 
 ### 技术栈
 
@@ -45,11 +49,12 @@ src/main/java/org/YanPl/
 ├── command/
 │   └── CLICommand.java           # CLI 命令处理
 ├── listener/
-│   └── ChatListener.java         # 聊天消息监听器
+│   └── ChatListener.java         # 聊天消息监听器（含玩家退出状态清理）
 ├── manager/
 │   ├── CLIManager.java           # CLI 模式管理器（核心对话逻辑，含防循环检测）
-│   ├── ConfigManager.java        # 配置管理（含防循环配置读取）
+│   ├── ConfigManager.java        # 配置管理（含防循环配置读取、调试模式）
 │   ├── EulaManager.java          # EULA 文件管理
+│   ├── NoticeManager.java        # 公告管理器（远程公告获取与显示）
 │   ├── PacketCaptureManager.java # 数据包捕获管理器（ProtocolLib）
 │   ├── PromptManager.java        # AI 提示词管理
 │   ├── UpdateManager.java        # 插件更新管理
@@ -78,7 +83,7 @@ src/main/resources/
     ├── protocollib.txt
     ├── residence.txt
     ├── vault.txt
-    ├── 造房预设.txt
+    ├── 造房必读预设.txt          # 房屋建造预设（必读）
     ├── give.txt                  # give 命令使用指南
     └── nbt格式（用则必看）.txt    # NBT 与数据组件格式详细说明
 ```
@@ -145,12 +150,14 @@ mvn clean package
 - 使用 `plugin.getLogger()` 记录日志
 - 关键操作使用 `[CLI]`, `[AI]`, `[PacketCapture]` 等前缀标识模块
 - 敏感信息（如 API 密钥）不应记录到日志中
+- 调试日志仅在启用 `debug` 模式时输出
 
 ### 状态管理
 
 - 使用 `CLIManager.GenerationStatus` 枚举管理 AI 生成状态
 - 支持的状态包括：`THINKING`, `EXECUTING_TOOL`, `WAITING_CONFIRM`, `WAITING_CHOICE`, `COMPLETED`, `CANCELLED`, `ERROR`, `IDLE`
 - 使用动作栏实时显示状态变化，通过 `PacketCaptureManager` 实现协议级拦截
+- 玩家退出时自动清理 CLI 会话状态，避免资源泄漏
 
 ## 核心功能模块
 
@@ -168,7 +175,12 @@ mvn clean package
 - YOLO（You Only Live Once）模式下，大部分 AI 生成的指令会自动执行，无需确认
 - 但对于高风险命令（如 op、ban、stop、reload 等），仍需玩家手动确认
 - 风险命令列表可在 `config.yml` 的 `settings.yolo_risk_commands` 中配置
-- 默认包含：op、deop、stop、reload、restart、kill、nbt、ban
+- 默认包含：op、deop、stop、reload、restart、kill、nbt、ban、unban、plugman
+
+**插件命令**：
+- `/fancyhelper` 或 `/cli` 或 `/fancy` - 进入 CLI 对话模式
+- `/fancyhelper reload` - 重新加载配置文件
+- `/fancyhelper notice` - 查看插件公告（需要 `fancyhelper.notice` 权限）
 
 ### 状态显示
 
@@ -219,7 +231,7 @@ AI 可以通过以下工具与服务器交互：
 - ProtocolLib（protocollib.txt）
 - Residence（residence.txt）
 - Vault（vault.txt）
-- 造房预设（造房预设.txt）
+- 造房必读预设（造房必读预设.txt）- 房屋建造专用预设
 - Give 命令指南（give.txt）
 - NBT 格式指南（nbt格式（用则必看）.txt）
 
@@ -247,13 +259,38 @@ Minecraft 在 1.20.5 版本对物品数据进行了重大重构：
 - 支持聊天消息捕获
 - 确保命令执行结果的完整反馈闭环
 
+### 公告系统
+
+`NoticeManager` 负责从远程获取并显示公告：
+
+- **远程获取**: 从指定 URL 异步获取公告数据
+- **多渠道显示**: 支持在控制台和玩家聊天中显示公告
+- **权限控制**: 只有拥有 `fancyhelper.notice` 权限的玩家才能查看公告
+- **自动显示**: 玩家加入服务器时自动显示公告（可通过配置关闭）
+- **公告格式**: 支持多行文本，正确处理换行符
+
+**配置项**：
+- `notice.show_on_join`: 玩家加入时是否显示插件公告（默认为 true）
+
+### 调试模式
+
+插件支持调试模式，启用后会在控制台输出详细调试信息：
+
+- **配置项**: `config.yml` 中的 `settings.debug`
+- **调试信息包括**:
+  - AI 请求详细信息（System Prompt 长度、历史消息数等）
+  - API 调用详细信息（URL、模型名称、响应状态码等）
+  - 命令索引和预设索引信息
+  - ProtocolLib 初始化状态
+  - Paper 聊天事件监听器注册状态
+
 ## 配置文件
 
 主要配置项位于 `config.yml`：
 
 ```yaml
 # 配置版本，请勿修改
-version: 3.0.0
+version: 3.2.1
 
 # CloudFlare Workers AI 配置
 cloudflare:
@@ -269,16 +306,30 @@ openai:
   enabled: false
 
   # OpenAI API 地址（支持自定义地址，如 OpenAI 官方、Azure OpenAI、本地模型等）
-  api_url: "https://api.openai.com/v1/chat/completions"
+  # 示例：
+  #   - OpenAI 官方: https://api.openai.com/v1/chat/completions
+  #   - DeepSeek: https://api.deepseek.com/chat/completions
+  #   - Ollama (本地): http://localhost:11434/v1/chat/completions
+  #   - 阿里云通义千问: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+  #   - 其他兼容 OpenAI 格式的 API
+  api_url: https://api.openai.com/v1/chat/completions
 
   # OpenAI API 密钥
-  api_key: "your-openai-api-key"
+  api_key: your-openai-api-key
 
   # 使用的模型名称
-  model: "gpt-4o"
+  # 示例：
+  #   - OpenAI: gpt-4o, gpt-4o-mini, o1-preview, o1-mini
+  #   - DeepSeek: deepseek-chat, deepseek-reasoner
+  #   - Ollama: llama3, mistral
+  #   - 阿里云通义千问: qwen-plus
+  model: gpt-4o
 
 # 插件设置
 settings:
+  # 是否启用调试模式，启用后会在控制台输出详细调试信息
+  debug: false
+
   # CLI 模式会话的自动过期时间（以分钟为单位）
   timeout_minutes: 10
 
@@ -324,10 +375,18 @@ settings:
     - kill
     - nbt
     - ban
+    - unban
+    - plugman
+
+# 公告配置
+notice:
+  # 玩家加入时是否显示插件公告（需要 FancyHelper.notice 权限）
+  show_on_join: true
 ```
 
 **settings 节点包含以下配置：**
 
+- `debug`: 是否启用调试模式（启用后在控制台输出详细调试信息）
 - `timeout_minutes`: CLI 模式会话的自动过期时间（分钟）
 - `api_timeout_seconds`: AI API 请求超时时间（秒）
   - 对于推理模型（如 `gpt-oss-120b`、`deepseek-reasoner`、`o1` 等），建议设置为 **120-300 秒**
@@ -355,6 +414,7 @@ settings:
 - **Azure OpenAI**: 使用 Azure OpenAI 服务
 - **DeepSeek**: 使用 DeepSeek API
 - **Ollama**: 使用本地运行的 Ollama 模型
+- **阿里云通义千问**: 使用阿里云通义千问 API（支持 OpenAI 兼容模式）
 - **其他兼容 OpenAI 格式的 API**: 任何提供 OpenAI 兼容接口的服务
 
 #### 配置示例
@@ -386,6 +446,15 @@ openai:
   model: "llama3"
 ```
 
+**阿里云通义千问配置：**
+```yaml
+openai:
+  enabled: true
+  api_url: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+  api_key: "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
+  model: "qwen-plus"
+```
+
 **Azure OpenAI 配置：**
 ```yaml
 openai:
@@ -400,6 +469,7 @@ openai:
 - **OpenAI**: `gpt-4o`, `gpt-4o-mini`, `o1-preview`, `o1-mini`, `gpt-4-turbo`
 - **DeepSeek**: `deepseek-chat`, `deepseek-reasoner`
 - **Ollama**: `llama3`, `mistral`, `codellama`, `phi3` 等（取决于本地安装的模型）
+- **阿里云通义千问**: `qwen-plus`, `qwen-turbo`, `qwen-max` 等
 
 #### 注意事项
 
@@ -407,6 +477,7 @@ openai:
 2. 确保 API URL 正确且可访问
 3. 某些 API 提供商可能有额外的请求头要求，插件目前只支持标准的 `Authorization` 和 `Content-Type` 头
 4. 对于推理模型（如 `deepseek-reasoner`、`o1-preview`），插件会自动添加推理参数
+5. 阿里云通义千问的 API URL 需要使用 `compatible-mode` 路径
 
 ## 测试建议
 
@@ -425,6 +496,8 @@ openai:
    - 预设加载机制
    - 防死循环检测
    - NBT/组件格式支持
+   - 调试模式输出
+   - 玩家退出时状态自动清理
 
 ## 常见问题
 
@@ -487,6 +560,24 @@ enforce-secure-profile=false
 1. 点击聊天中的 `[ 本次对话不再打断 ]` 按钮豁免当前会话
 2. 或调整 `config.yml` 中的 `anti_loop` 配置参数
 
+### 调试模式
+
+如果需要查看详细的调试信息，可以在 `config.yml` 中启用调试模式：
+
+```yaml
+settings:
+  debug: true
+```
+
+启用后，控制台会输出：
+- AI 请求的详细信息（System Prompt 长度、历史消息数）
+- API 调用的详细信息（URL、模型名称、响应状态码）
+- 命令和预设的索引信息
+- ProtocolLib 初始化状态
+- Paper 聊天事件监听器注册状态
+
+**注意**：调试模式会产生大量日志输出，建议仅在开发或排查问题时启用。
+
 ### CloudFlare API 配置
 
 配置 `cf_key` 后，插件会自动获取对应的 `account-id`，无需手动配置。
@@ -509,7 +600,14 @@ feat(CLI): 添加生成状态可视化与实时反馈
 fix(CLIManager): 添加错误状态处理并修复异常状态显示
 fix(CLI): 将状态显示从副标题改为动作栏并修复计时器问题
 feat(防循环): 添加防死循环检测机制
+feat: 添加玩家退出时清理CLI状态的监听器
+docs(preset): 更新房屋建造预设并优化提示说明
+fix(CLI): 退出前自动取消待处理的操作
+chore: 更新版本至3.1.0
 style(CLIManager): 修正 YOLO 模式消息发送行的缩进
+feat(公告): 添加远程公告系统支持
+fix(公告): 正确处理公告文本中的换行符
+feat(CLI): 在对话会话中记录并显示总思考时间
 ```
 
 ### bStats 统计
@@ -536,15 +634,6 @@ style(CLIManager): 修正 YOLO 模式消息发送行的缩进
 - 将 `enforce-secure-profile` 设置为 `false`
 - 在日志中显示详细的操作结果
 
-示例：
-```
-feat(CLI): 添加生成状态可视化与实时反馈
-fix(CLIManager): 添加错误状态处理并修复异常状态显示
-fix(CLI): 将状态显示从副标题改为动作栏并修复计时器问题
-feat(防循环): 添加防死循环检测机制
-style(CLIManager): 修正 YOLO 模式消息发送行的缩进
-```
-
 ### ProtocolLib 集成
 
 在使用 ProtocolLib 功能时：
@@ -557,6 +646,7 @@ style(CLIManager): 修正 YOLO 模式消息发送行的缩进
 - 使用 `CLIManager.GenerationStatus` 枚举而非字符串
 - 更新状态时同步更新 `generationStates` 和相关映射
 - 状态变更应触发相应的 UI 更新（动作栏）
+- 玩家退出时自动清理 CLI 会话状态，避免资源泄漏
 
 ### CloudFlare API 使用
 
@@ -572,6 +662,18 @@ style(CLIManager): 修正 YOLO 模式消息发送行的缩进
 - 支持会话级豁免机制
 - 配置参数位于 `ConfigManager.getAntiLoop*()` 方法
 
+### 调试日志实现
+
+- 所有调试日志输出都应使用 `ConfigManager.isDebug()` 进行判断
+- 调试信息应包含足够的上下文，便于问题排查
+- 避免在调试日志中输出敏感信息（如 API 密钥）
+
+### 资源清理
+
+- 玩家退出时自动清理 CLI 会话状态，防止资源泄漏
+- 取消待处理的操作，避免后台任务继续执行
+- 插件禁用时正确关闭所有资源（见 `FancyHelper.onDisable()` 和 `CLIManager.shutdown()`）
+
 ## 许可证
 
-© 2026 baicaizhale, zip8919. 保留所有权利。
+© 2025-2026 baicaizhale, zip8919. 保留所有权利。
