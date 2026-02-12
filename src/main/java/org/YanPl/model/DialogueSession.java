@@ -6,6 +6,7 @@ import com.knuddels.jtokkit.api.EncodingRegistry;
 import com.knuddels.jtokkit.api.EncodingType;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,6 +35,13 @@ public class DialogueSession {
     private Mode mode = Mode.NORMAL;
     private String lastThought = null;
     private long lastThinkingTimeMs = 0;
+    private long nextMessageId = 0;
+    private final Map<Long, ThoughtSnapshot> thoughtSnapshots = new LinkedHashMap<Long, ThoughtSnapshot>(64, 0.75f, false) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Long, ThoughtSnapshot> eldest) {
+            return size() > 50;
+        }
+    };
 
     /**
      * 编码注册表（单例）
@@ -86,8 +94,16 @@ public class DialogueSession {
 
     public void addMessage(String role, String content, String thought) {
         // 添加消息并更新活动时间；限制历史长度以节省 token
-        history.add(new Message(role, content, thought));
+        long messageId = nextMessageId++;
+        long thinkingTimeMs = thought != null && !thought.isEmpty() ? lastThinkingTimeMs : 0;
+        history.add(new Message(messageId, role, content, thought, thinkingTimeMs));
         this.lastActivityTime = System.currentTimeMillis();
+
+        if (thought != null && !thought.isEmpty()) {
+            synchronized (thoughtSnapshots) {
+                thoughtSnapshots.put(messageId, new ThoughtSnapshot(thought, thinkingTimeMs));
+            }
+        }
         
         if (history.size() > 20) {
             // 移除最早的两条，保持历史在一个较小范围
@@ -129,6 +145,9 @@ public class DialogueSession {
     public void clearHistory() {
         history.clear();
         toolCallHistory.clear();
+        synchronized (thoughtSnapshots) {
+            thoughtSnapshots.clear();
+        }
     }
 
     public int getToolSuccessCount() {
@@ -260,19 +279,70 @@ public class DialogueSession {
         this.lastThought = lastThought;
     }
 
+    /**
+     * 获取某条消息对应的思考快照（用于稳定地回放对应 Thought）。
+     */
+    public ThoughtSnapshot getThoughtSnapshot(long messageId) {
+        synchronized (thoughtSnapshots) {
+            return thoughtSnapshots.get(messageId);
+        }
+    }
+
+    /**
+     * 在当前历史中按 messageId 查找消息（历史可能会因裁剪而丢失旧消息）。
+     */
+    public Message findMessageById(long messageId) {
+        for (Message message : history) {
+            if (message.getId() == messageId) {
+                return message;
+            }
+        }
+        return null;
+    }
+
+    public static class ThoughtSnapshot {
+        private final String thought;
+        private final long thinkingTimeMs;
+
+        public ThoughtSnapshot(String thought, long thinkingTimeMs) {
+            this.thought = thought;
+            this.thinkingTimeMs = thinkingTimeMs;
+        }
+
+        public String getThought() {
+            return thought;
+        }
+
+        public long getThinkingTimeMs() {
+            return thinkingTimeMs;
+        }
+    }
+
     public static class Message {
+        private final long id;
         private final String role;
         private final String content;
         private final String thought;
+        private final long thinkingTimeMs;
 
         public Message(String role, String content) {
-            this(role, content, null);
+            this(-1, role, content, null, 0);
         }
 
         public Message(String role, String content, String thought) {
+            this(-1, role, content, thought, 0);
+        }
+
+        public Message(long id, String role, String content, String thought, long thinkingTimeMs) {
+            this.id = id;
             this.role = role != null ? role : "user";
             this.content = content != null ? content : "";
             this.thought = thought;
+            this.thinkingTimeMs = thinkingTimeMs;
+        }
+
+        public long getId() {
+            return id;
         }
 
         public String getRole() {
@@ -285,6 +355,10 @@ public class DialogueSession {
 
         public String getThought() {
             return thought;
+        }
+
+        public long getThinkingTimeMs() {
+            return thinkingTimeMs;
         }
 
         public boolean hasThought() {
