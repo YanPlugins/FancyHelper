@@ -56,7 +56,7 @@ public class PromptManager {
         sb.append("2. 【单命令执行】#run 工具一次只能执行一条命令，禁止使用 && 或 ; 连接多个命令。\n");
         sb.append("3. 【工具位置】工具调用必须另起一行，不得在正文或注释中调用。\n");
         sb.append("4. 【格式规范】工具名和冒号之间不要有空格，命令参数不要带斜杠 /。\n");
-        sb.append("5. 【强制读预设】执行任务前必须先调用 #getpreset 查看相关预设文件。\n");
+        sb.append("5. 【强制读预设】执行任务前必须先调用 #getpreset 查看相关预设文件（如果存在）。\n");
         sb.append("   - 例如：玩家询问 LuckPerms 权限时，必须先调用 #getpreset: luckperms.txt\n\n");
         
         sb.append("正确示例：\n");
@@ -81,15 +81,15 @@ public class PromptManager {
         
         sb.append("【执行类工具】\n");
         sb.append("  #run: <command> - 以玩家身份执行命令。**注意：一次只能执行一条命令**。\n");
-        sb.append("  #over - 完成任务，停止本轮输出。\n");
+        sb.append("  #over - 任务完成标志。**必须放在回复末尾，且前面必须有对玩家的总结回复，严禁单独调用。**\n");
         sb.append("  #exit - 当用户想退出 FancyHelper 时调用。\n\n");
         
-        sb.append("【文件类工具】\n");
+        sb.append("【文件类工具】（以下工具的执行结果玩家不可见）\n");
         if (plugin.getConfigManager().isPlayerToolEnabled(player, "ls")) {
-            sb.append("  #ls: <path> - 列出目录内容（玩家不可见）。如 #ls: plugins/FancyHelper\n");
+            sb.append("  #ls: <path> - 列出目录内容。如 #ls: plugins/FancyHelper\n");
         }
         if (plugin.getConfigManager().isPlayerToolEnabled(player, "read")) {
-            sb.append("  #read: <path> - 读取文件内容（玩家不可见）。如 #read: plugins/FancyHelper/config.yml\n");
+            sb.append("  #read: <path> - 读取文件内容。如 #read: plugins/FancyHelper/config.yml\n");
         }
         if (plugin.getConfigManager().isPlayerToolEnabled(player, "diff")) {
             sb.append("  #diff: <path>|<search>|<replace> - 修改文件内容（查找替换）。\n");
@@ -123,8 +123,8 @@ public class PromptManager {
         sb.append("   - 重要：调用 #todo 后必须立即结束回复，禁止在同一回复中调用其他工具。\n\n");
         
         // ==================== 错误处理 ====================
-        sb.append("【错误处理】\n");
-        sb.append("如果执行命令后收到反馈说\"系统未能捕获输出\"，可能是命令直接发送到玩家屏幕，建议询问用户是否看到预期结果。\n\n");
+        // sb.append("【错误处理】\n");
+        // sb.append("如果执行命令后收到反馈说\"系统未能捕获输出\"，可能是命令直接发送到玩家屏幕，建议询问用户是否看到预期结果。\n\n");
         
         return sb.toString(); 
     }
