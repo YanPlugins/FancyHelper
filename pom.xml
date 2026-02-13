@@ -89,7 +89,7 @@
                 <version>11.1.0</version>
                 <configuration>
                     <format>HTML</format>
-                    <outputDirectory>reports</output>
+                    <outputDirectory>reports</outputDirectory>
                     <enableRetired>true</enableRetired>
                     <enableExperimental>true</enableExperimental>
                     <failBuildOnCVSS>0</failBuildOnCVSS>
