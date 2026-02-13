@@ -100,7 +100,7 @@ jobs:
 
       - name: OWASP 依赖检查
         run: |
-          mvn org.owasp:dependency-check-maven:check -Dformat=HTML -DoutputDirectory=reports
+          mvn org.owasp:dependency-check-maven:check -Dformat=HTML -DoutputDirectory=reports -Dnoupdate=true
 
       - name: 上传安全报告
         uses: actions/upload-artifact@v4
