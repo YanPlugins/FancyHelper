@@ -308,7 +308,8 @@ public class TodoManager {
      * @return TextComponent
      */
     public net.md_5.bungee.api.chat.TextComponent getTodoDisplayComponent(Player player) {
-        List<TodoItem> todos = getTodos(player.getUniqueId());
+        UUID uuid = player.getUniqueId();
+        List<TodoItem> todos = getTodos(uuid);
         net.md_5.bungee.api.chat.TextComponent component = new net.md_5.bungee.api.chat.TextComponent();
 
         if (todos.isEmpty()) {
@@ -317,19 +318,22 @@ public class TodoManager {
         }
 
         // 构建显示文本
-        String summary = getTodoSummary(player.getUniqueId());
+        String summary = getTodoSummary(uuid);
         component.setText(ChatColor.GOLD + "☐ " + ChatColor.WHITE + summary);
 
-        // 设置点击事件
+        // 设置点击事件：保留打开书本功能
         component.setClickEvent(new net.md_5.bungee.api.chat.ClickEvent(
                 net.md_5.bungee.api.chat.ClickEvent.Action.RUN_COMMAND,
                 "/fancyhelper todo"
         ));
 
-        // 设置悬停事件
+        // 设置悬停事件：显示详细列表
+        String details = getTodoDetails(uuid);
+        String hoverText = ChatColor.AQUA + details + "\n\n" + ChatColor.YELLOW + "» 点击打开完整书本列表";
+
         component.setHoverEvent(new net.md_5.bungee.api.chat.HoverEvent(
                 net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
-                new Text(ChatColor.AQUA + "点击查看完整 TODO 列表")
+                new Text(hoverText)
         ));
 
         return component;
