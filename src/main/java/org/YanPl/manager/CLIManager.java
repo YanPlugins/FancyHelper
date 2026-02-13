@@ -201,7 +201,7 @@ public class CLIManager {
                     if (session != null && (now - session.getLastActivityTime()) > timeoutMs) {
                         Player player = Bukkit.getPlayer(uuid);
                         if (player != null) {
-                            player.sendMessage("§l§bFancyHelper§b§r §7> §e由于长时间未活动，已自动退出 FancyHelper。");
+                            player.sendMessage("§l§bFancyHelper§b§r §7> §f由于长时间未活动，已自动退出 FancyHelper。");
                             exitCLI(player);
                         } else {
                             activeCLIPayers.remove(uuid);
@@ -220,6 +220,10 @@ public class CLIManager {
         new BukkitRunnable() {
             @Override
             public void run() {
+                if (!plugin.isEnabled()) {
+                    this.cancel();
+                    return;
+                }
                 long now = System.currentTimeMillis();
                 
                 for (UUID uuid : activeCLIPayers) {
@@ -258,9 +262,11 @@ public class CLIManager {
                             message = ChatColor.GREEN + "- ✓ -";
                             sendStatusMessage(player, message);
                             // 清除显示，2秒后清除 (40 ticks)
-                            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                                clearStatusMessage(player);
-                            }, 40L);
+                            if (plugin.isEnabled()) {
+                                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                                    clearStatusMessage(player);
+                                }, 40L);
+                            }
                             generationStates.put(uuid, GenerationStatus.IDLE);
                             generationStartTimes.remove(uuid);
                             break;
@@ -268,9 +274,11 @@ public class CLIManager {
                             message = ChatColor.RED + "- ✕ -";
                             sendStatusMessage(player, message);
                             // 清除显示，2秒后清除 (40 ticks)
-                            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                                clearStatusMessage(player);
-                            }, 40L);
+                            if (plugin.isEnabled()) {
+                                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                                    clearStatusMessage(player);
+                                }, 40L);
+                            }
                             generationStates.put(uuid, GenerationStatus.IDLE);
                             generationStartTimes.remove(uuid);
                             break;
@@ -278,9 +286,11 @@ public class CLIManager {
                             message = ChatColor.RED + "- ERROR -";
                             sendStatusMessage(player, message);
                             // 清除显示，2秒后清除 (40 ticks)
-                            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                                clearStatusMessage(player);
-                            }, 40L);
+                            if (plugin.isEnabled()) {
+                                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                                    clearStatusMessage(player);
+                                }, 40L);
+                            }
                             generationStates.put(uuid, GenerationStatus.IDLE);
                             generationStartTimes.remove(uuid);
                             break;
@@ -378,7 +388,7 @@ public class CLIManager {
 
         // 检查 EULA 文件状态
         if (!plugin.getEulaManager().isEulaValid()) {
-            player.sendMessage("§l§bFancyHelper§b§r §7> §c错误：EULA 文件缺失或被非法改动且无法还原，请联系管理员检查权限设置。");
+            player.sendMessage("§l§bFancyHelper§b§r §7> §f错误：EULA 文件缺失或被非法改动且无法还原，请联系管理员检查权限设置。");
             plugin.getLogger().warning("[CLI] 由于 EULA 文件无效，拒绝了 " + player.getName() + " 的访问。");
             return;
         }
@@ -433,10 +443,11 @@ public class CLIManager {
         isGenerating.put(uuid, true); // 设置生成状态，防止在此期间玩家输入触发新的 AI 调用
 
         // 进入 CLI 后 0.3s 延迟展示 (约 6 ticks)
+        if (!plugin.isEnabled()) return;
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             try {
                 // 检查玩家是否仍在线且在 CLI 模式中
-                if (!activeCLIPayers.contains(uuid) || !player.isOnline()) return;
+                if (!plugin.isEnabled() || !activeCLIPayers.contains(uuid) || !player.isOnline()) return;
 
                 // 1. 获取基于时间的问候语
                 int hour = java.time.LocalDateTime.now().getHour();
@@ -866,7 +877,7 @@ public class CLIManager {
                     // 保存重试信息
                     retryInfoMap.put(uuid, new RetryInfo(session, promptManager.getBaseSystemPrompt(player), message, true));
 
-                    player.sendMessage("§l§bFancyHelper§b§r §7> §cAI 调用出错: " + e.getMessage());
+                    player.sendMessage("§l§bFancyHelper§b§r §7> §fAI 调用出错: " + e.getMessage());
 
                     // 显示重试按钮
                     TextComponent retryMsg = new TextComponent(ChatColor.YELLOW + "点击 ");
@@ -894,7 +905,7 @@ public class CLIManager {
                     // 保存重试信息
                     retryInfoMap.put(uuid, new RetryInfo(session, promptManager.getBaseSystemPrompt(player), message, true));
 
-                    player.sendMessage("§l§bFancyHelper§b§r §7> §c系统内部错误: " + t.getMessage());
+                    player.sendMessage("§l§bFancyHelper§b§r §7> §f系统内部错误: " + t.getMessage());
 
                     // 显示重试按钮
                     TextComponent retryMsg = new TextComponent(ChatColor.YELLOW + "点击 ");
@@ -1543,6 +1554,7 @@ public class CLIManager {
             plugin.getPacketCaptureManager().startCapture(player);
         }
 
+        if (!plugin.isEnabled()) return;
         Bukkit.getScheduler().runTask(plugin, () -> {
             StringBuilder output = new StringBuilder();
             
@@ -1574,6 +1586,7 @@ public class CLIManager {
             player.sendMessage(ChatColor.GRAY + "⇒ 命令已下发，等待反馈中...");
 
             // 延迟 1 秒（20 ticks）后再处理结果，给异步任务留出时间
+            if (!plugin.isEnabled()) return;
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 // 停止并获取数据包捕获结果
                 String packetOutput = "";
@@ -1810,6 +1823,7 @@ public class CLIManager {
         player.sendMessage(ChatColor.GRAY + "〇 #search: " + query);
         generationStates.put(player.getUniqueId(), GenerationStatus.EXECUTING_TOOL);
         
+        if (!plugin.isEnabled()) return;
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             String result;
             if (query.toLowerCase().contains("widely")) {
@@ -1825,6 +1839,7 @@ public class CLIManager {
             }
             
             final String finalResult = result;
+            if (!plugin.isEnabled()) return;
             Bukkit.getScheduler().runTask(plugin, () -> {
                 feedbackToAI(player, "#search_result: " + finalResult);
             });
@@ -2173,7 +2188,7 @@ public class CLIManager {
     public void handleThought(Player player, String[] args) {
         DialogueSession session = sessions.get(player.getUniqueId());
         if (session == null) {
-            player.sendMessage("§l§bFancyHelper§b§r §7> §c当前没有活动的对话。");
+            player.sendMessage("§l§bFancyHelper§b§r §7> §f当前没有活动的对话。");
             return;
         }
 
@@ -2219,7 +2234,7 @@ public class CLIManager {
         }
 
         if (thought == null) {
-            player.sendMessage("§l§bFancyHelper§b§r §7> §c找不到对应的思考过程。");
+            player.sendMessage("§l§bFancyHelper§b§r §7> §f找不到对应的思考过程。");
             return;
         }
 

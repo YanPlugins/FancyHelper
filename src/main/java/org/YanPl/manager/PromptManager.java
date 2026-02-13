@@ -81,7 +81,7 @@ public class PromptManager {
         
         sb.append("【执行类工具】\n");
         sb.append("  #run: <command> - 以玩家身份执行命令。**注意：一次只能执行一条命令**。\n");
-        sb.append("  #over - 任务完成标志。**必须放在回复末尾，且前面必须有对玩家的总结回复，严禁单独调用。**\n");
+        sb.append("  #over - 本轮输出完毕，即没有其他工具需要被调用时使用。**必须放在回复末尾，且前面必须有对玩家的总结回复，严禁单独调用。**\n");
         sb.append("  #exit - 当用户想退出 FancyHelper 时调用。\n\n");
         
         sb.append("【文件类工具】（以下工具的执行结果玩家不可见）\n");
