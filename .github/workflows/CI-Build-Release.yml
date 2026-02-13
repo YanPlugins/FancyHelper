@@ -98,6 +98,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
+      - name: 缓存 NVD 数据库
+        uses: actions/cache@v4
+        with:
+          path: ~/.dependency-check-cache
+          key: ${{ runner.os }}-nvd-db-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-nvd-db-
+
       - name: OWASP 依赖检查
         run: |
           mvn org.owasp:dependency-check-maven:check -Dformat=HTML -DoutputDirectory=reports -Dnoupdate=true
