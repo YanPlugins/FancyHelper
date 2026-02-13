@@ -118,12 +118,16 @@ public class CLICommand implements CommandExecutor, TabCompleter {
             case "select":
             case "exempt_anti_loop":
             case "todo":
+            case "retry":
                 if (!(sender instanceof Player)) {
                     sender.sendMessage(ChatColor.RED + "该子命令仅限玩家使用。");
                     return true;
                 }
                 Player player = (Player) sender;
                 return handlePlayerSubCommand(player, subCommand, args);
+            case "help":
+                sendHelp(sender);
+                return true;
             case "error":
                 if (!sender.isOp()) {
                     sender.sendMessage("§l§bFancyHelper§b§r §7> §c该测试命令仅限管理员使用。");
@@ -136,11 +140,26 @@ public class CLICommand implements CommandExecutor, TabCompleter {
                 }
                 return true;
             default:
-                sender.sendMessage("§l§bFancyHelper§b§r §7> §c未知子命令。用法: /cli [reload|status|settings|notice]");
+                sendHelp(sender);
                 break;
         }
 
         return true;
+    }
+
+    private void sendHelp(CommandSender sender) {
+        sender.sendMessage("§l§bFancyHelper§b§r §7> §f可用子命令:");
+        sender.sendMessage(" §7- §b/cli §f: 切换进入/退出 CLI 模式");
+        sender.sendMessage(" §7- §b/cli reload §f: 重新加载配置与工作区");
+        sender.sendMessage(" §7- §b/cli status §f: 查看插件运行状态");
+        sender.sendMessage(" §7- §b/cli settings §f: 打开个人设置界面");
+        sender.sendMessage(" §7- §b/cli notice §f: 查看系统公告");
+        sender.sendMessage(" §7- §b/cli retry §f: 重试上一次失败的 AI 调用");
+        sender.sendMessage(" §7- §b/cli todo §f: 查看待办事项列表");
+        sender.sendMessage(" §7- §b/cli yolo/normal §f: 切换 YOLO 模式 (自动执行) / 普通模式");
+        if (sender.hasPermission("fancyhelper.reload")) {
+            sender.sendMessage(" §7- §b/cli update §f: 检查并安装插件更新");
+        }
     }
 
     private boolean handlePlayerSubCommand(Player player, String subCommand, String[] args) {
