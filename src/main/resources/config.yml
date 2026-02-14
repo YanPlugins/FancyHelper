@@ -85,8 +85,6 @@ openai:
   #   - 阿里云通义千问: qwen3-max
   model: gpt-4o
 
-
-
 # Tavily 搜索 API 配置（用于增强全网搜索能力）
 tavily:
   # 是否启用 Tavily 搜索（启用后将使用 Tavily API 进行全网搜索，关闭时使用免费的UAPI进行搜索）
