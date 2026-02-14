@@ -16,7 +16,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -412,7 +411,7 @@ public class CLIManager {
 
         // 创建日志文件
         try {
-            Path logDir = Paths.get("log", "FancyHelper");
+            Path logDir = plugin.getDataFolder().toPath().resolve("logs");
             Files.createDirectories(logDir);
             String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss-SSS"));
             String logFileName = timestamp + ".log";
