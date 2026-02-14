@@ -2260,7 +2260,10 @@ public class CLIManager {
             // 获取本次思考的时长
             double lastThinkingSec = thinkingTimeMs / 1000.0;
             String timePrefix = ChatColor.DARK_GRAY + "Thought (" + String.format("%.1f", lastThinkingSec) + "s)\n\n" + ChatColor.RESET;
-            String fullThought = timePrefix + thought;
+            
+            // 将 **文本** 转换为 Minecraft 粗体格式 §l文本§r
+            String formattedThought = convertMarkdownBoldToMinecraft(thought);
+            String fullThought = timePrefix + formattedThought;
             
             // 分页处理（书本每页约 256 字符，但实际受行数限制，使用 128 作为安全边距）
             List<String> pages = new ArrayList<>();
@@ -2276,6 +2279,20 @@ public class CLIManager {
             // 打开书本
             player.openBook(book);
         }
+    }
+
+    /**
+     * 将 Markdown 粗体语法 **文本** 转换为 Minecraft 颜色代码格式 §l文本§r
+     * @param text 原始文本
+     * @return 转换后的文本
+     */
+    private String convertMarkdownBoldToMinecraft(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        // 使用正则表达式匹配 **文本** 并替换为 §l文本§r
+        // 使用非贪婪匹配避免跨多个粗体块的问题
+        return text.replaceAll("\\*\\*(.+?)\\*\\*", "§l$1§r");
     }
 
     private void sendAgreement(Player player) {
