@@ -50,7 +50,7 @@ public final class FancyHelper extends JavaPlugin {
         // 初始化验证管理器
         verificationManager = new VerificationManager(this);
         
-        // 检查 ProtocolLib 依赖（改为可选）
+        // 检查 ProtocolLib 依赖并初始化数据包捕获管理器
         if (getServer().getPluginManager().isPluginEnabled("ProtocolLib")) {
             // 初始化数据包捕获管理器
             packetCaptureManager = new PacketCaptureManager(this);
