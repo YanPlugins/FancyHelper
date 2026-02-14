@@ -283,6 +283,46 @@ public class ConfigManager {
      * @return 是否在玩家加入时显示公告
      */
     /**
+     * 获取是否启用 Tavily 搜索
+     * @return 是否启用
+     */
+    public boolean isTavilyEnabled() {
+        return config.getBoolean("tavily.enabled", false);
+    }
+
+    /**
+     * 获取 Tavily API 密钥
+     * @return API 密钥
+     */
+    public String getTavilyApiKey() {
+        return config.getString("tavily.api_key", "");
+    }
+
+    /**
+     * 获取 Tavily API 代理地址
+     * @return 代理地址（如为空则使用官方地址）
+     */
+    public String getTavilyProxyUrl() {
+        return config.getString("tavily.proxy_url", "");
+    }
+
+    /**
+     * 获取 Tavily 搜索结果数量限制
+     * @return 结果数量限制（1-10）
+     */
+    public int getTavilyMaxResults() {
+        return config.getInt("tavily.max_results", 5);
+    }
+
+    /**
+     * 获取 Tavily 是否包含原始内容
+     * @return 是否包含原始内容
+     */
+    public boolean isTavilyIncludeRawContent() {
+        return config.getBoolean("tavily.include_raw_content", false);
+    }
+
+    /**
      * 获取公告刷新间隔（分钟）
      * @return 刷新间隔
      */
@@ -304,6 +344,14 @@ public class ConfigManager {
      */
     public String getSupplementaryPrompt() {
         return config.getString("settings.supplementary_prompt", "");
+    }
+
+    /**
+     * 获取是否启用调试模式
+     * @return 是否启用调试模式
+     */
+    public boolean isDebug() {
+        return config.getBoolean("settings.debug", false);
     }
 
     /**

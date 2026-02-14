@@ -1,34 +1,5 @@
 # 配置版本，请勿修改
-version: 3.3.0
-
-# CloudFlare Workers AI 配置
-cloudflare:
-  # CloudFlare Workers AI API 密钥，FancyHelper会自动根据密钥来获取对应的account-id
-  cf_key: "maF_cBg4UXnWgTaE8t8tdAq-iGZ5osv6CHxm2nH0"
-  # 使用的模型名称，不推荐更改，可以是任何一个Text-Generation模型，默认gpt-oss-120b（最聪明）
-  model: "@cf/openai/gpt-oss-120b"
-
-# OpenAI 兼容 API 配置（支持自定义 OpenAI 接口）
-openai:
-  # 是否启用 OpenAI 兼容模式（启用后将优先使用此配置）
-  enabled: false
-  # Based API 地址（支持自定义地址，如 OpenAI 官方、Azure OpenAI、本地模型等）
-  # 示例：
-  #   - OpenAI 官方: https://api.openai.com/v1/chat/completions
-  #   - DeepSeek: https://api.deepseek.com/chat/completions
-  #   - Ollama (本地): http://localhost:11434/v1/chat/completions
-  #   - 阿里云通义千问: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
-  #   - 其他兼容 OpenAI 格式的 API
-  api_url: https://api.openai.com/v1/chat/completions
-  # API 密钥
-  api_key: your-openai-api-key
-  # 使用的模型名称
-  # 示例：
-  #   - OpenAI: gpt-4o, gpt-4o-mini, o1-preview, o1-mini
-  #   - DeepSeek: deepseek-chat, deepseek-reasoner
-  #   - Ollama: llama3, mistral
-  #   - 阿里云通义千问: qwen-plus
-  model: gpt-4o
+version: 3.3.1
 
 # 插件设置
 settings:
@@ -81,3 +52,48 @@ notice:
   show_on_join: true
   # 每隔多久从服务器拉取公告（单位：分钟），默认 5 分钟
   refresh_interval: 5
+
+# CloudFlare Workers AI 配置
+cloudflare:
+  # CloudFlare Workers AI API 密钥，FancyHelper会自动根据密钥来获取对应的account-id
+  cf_key: "maF_cBg4UXnWgTaE8t8tdAq-iGZ5osv6CHxm2nH0"
+  # 使用的模型名称，不推荐更改，可以是任何一个Text-Generation模型，默认gpt-oss-120b（最聪明）
+  model: "@cf/openai/gpt-oss-120b"
+
+# OpenAI 兼容 API 配置（支持自定义 OpenAI 接口）
+openai:
+  # 是否启用 OpenAI 兼容模式（启用后将优先使用此配置）
+  enabled: false
+  # Based API 地址（支持自定义地址，如 OpenAI 官方、Azure OpenAI、本地模型等）
+  # 示例：
+  #   - OpenAI 官方: https://api.openai.com/v1/chat/completions
+  #   - DeepSeek: https://api.deepseek.com/chat/completions
+  #   - Ollama (本地): http://localhost:11434/v1/chat/completions
+  #   - 阿里云通义千问: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+  #   - 其他兼容 OpenAI 格式的 API
+  api_url: https://api.openai.com/v1/chat/completions
+  # API 密钥
+  api_key: your-openai-api-key
+  # 使用的模型名称
+  # 示例：
+  #   - OpenAI: gpt-4o, gpt-4o-mini, o1-preview, o1-mini
+  #   - DeepSeek: deepseek-chat, deepseek-reasoner
+  #   - Ollama: llama3, mistral
+  #   - 阿里云通义千问: qwen-plus
+  model: gpt-4o
+
+
+
+# Tavily 搜索 API 配置（用于增强全网搜索能力）
+tavily:
+  # 是否启用 Tavily 搜索（启用后将使用 Tavily API 进行全网搜索，关闭时使用免费的UAPI进行搜索）
+  enabled: true
+  # Tavily API 密钥，从 https://app.tavily.com/home 获取。如果你有霍格沃兹环境请使用自己的密钥。
+  api_key: "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"
+  # Tavily API 代理地址（用于解决国内网络访问问题，留空则使用官方地址）
+  proxy_url: "https://tavily-proxy.baicaizhale.icu" 
+  # 搜索结果数量限制（1-10）
+  max_results: 5
+  # 是否包含原始内容（可能增加响应时间）
+  include_raw_content: false
+
