@@ -1,5 +1,7 @@
 package org.YanPl;
 
+import org.YanPl.api.CloudFlareAI;
+import org.YanPl.api.TavilyAPI;
 import org.YanPl.command.CLICommand;
 import org.YanPl.listener.ChatListener;
 import org.YanPl.manager.CLIManager;
@@ -32,6 +34,7 @@ public final class FancyHelper extends JavaPlugin {
     private TodoManager todoManager;
     private NoticeManager noticeManager;
     private FileWatcherManager fileWatcherManager;
+    private TavilyAPI tavilyAPI;
 
     @Override
     public void onEnable() {
@@ -50,7 +53,7 @@ public final class FancyHelper extends JavaPlugin {
         // 初始化验证管理器
         verificationManager = new VerificationManager(this);
         
-        // 检查 ProtocolLib 依赖（改为可选）
+        // 检查 ProtocolLib 依赖并初始化数据包捕获管理器
         if (getServer().getPluginManager().isPluginEnabled("ProtocolLib")) {
             // 初始化数据包捕获管理器
             packetCaptureManager = new PacketCaptureManager(this);
@@ -83,6 +86,9 @@ public final class FancyHelper extends JavaPlugin {
 
         // 初始化文件监听管理器
         fileWatcherManager = new FileWatcherManager(this);
+
+        // 初始化 Tavily API
+        tavilyAPI = new TavilyAPI(this);
 
         CLICommand cliCommand = new CLICommand(this);
         getCommand("fancyhelper").setExecutor(cliCommand);
@@ -291,5 +297,9 @@ public final class FancyHelper extends JavaPlugin {
 
     public NoticeManager getNoticeManager() {
         return noticeManager;
+    }
+
+    public TavilyAPI getTavilyAPI() {
+        return tavilyAPI;
     }
 }

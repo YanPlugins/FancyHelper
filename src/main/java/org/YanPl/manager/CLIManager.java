@@ -1827,14 +1827,26 @@ public class CLIManager {
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             String result;
             if (query.toLowerCase().contains("widely")) {
+                // 全网搜索模式
                 String q = query.replace("widely", "").trim();
-                result = fetchPublicSearchResult(q);
+                // 优先使用 Tavily API
+                if (plugin.getConfigManager().isTavilyEnabled()) {
+                    result = plugin.getTavilyAPI().search(q);
+                } else {
+                    result = fetchPublicSearchResult(q);
+                }
             } else {
+                // 先尝试 Wiki 搜索
                 result = fetchWikiResult(query);
                 // 如果 Wiki 没搜到，自动尝试全网搜索
                 if (result.equals("未找到相关 Wiki 条目。")) {
                     player.sendMessage(ChatColor.GRAY + "〇 Wiki 无结果，正在尝试全网搜索...");
-                    result = fetchPublicSearchResult(query);
+                    // 优先使用 Tavily API
+                    if (plugin.getConfigManager().isTavilyEnabled()) {
+                        result = plugin.getTavilyAPI().search(query);
+                    } else {
+                        result = fetchPublicSearchResult(query);
+                    }
                 }
             }
             
