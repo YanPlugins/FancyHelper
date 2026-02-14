@@ -5,9 +5,9 @@ version: 3.4.0
 settings:
   # 是否启用调试模式，启用后会在控制台输出详细调试信息
   debug: false
-  # 是否启用猫娘模式（开启后 Fancy 将同时扮演猫娘角色）
+  # 是否启用猫娘模式，启用后Fancy将扮演猫娘，注意某些模型(特别是国产模型)可能会拒绝这个要求
   meow: false
-  # 补充系统提示词（会自动追加到基础系统提示词后面）
+  # 补充系统提示词（会自动追加到基础系统提示词后面，不会就留空）
   supplementary_prompt: ""
   # CLI 模式会话的自动过期时间 （以分钟为单位）
   timeout_minutes: 10
@@ -72,6 +72,7 @@ openai:
   #   - DeepSeek: https://api.deepseek.com/chat/completions
   #   - Ollama (本地): http://localhost:11434/v1/chat/completions
   #   - 阿里云通义千问: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+  #   - 心流开放平台：https://apis.iflow.cn/v1/chat/completions
   #   - 其他兼容 OpenAI 格式的 API
   api_url: https://api.openai.com/v1/chat/completions
   # API 密钥
@@ -81,7 +82,7 @@ openai:
   #   - OpenAI: gpt-4o, gpt-4o-mini, o1-preview, o1-mini
   #   - DeepSeek: deepseek-chat, deepseek-reasoner
   #   - Ollama: llama3, mistral
-  #   - 阿里云通义千问: qwen-plus
+  #   - 阿里云通义千问: qwen3-max
   model: gpt-4o
 
 
@@ -90,9 +91,9 @@ openai:
 tavily:
   # 是否启用 Tavily 搜索（启用后将使用 Tavily API 进行全网搜索，关闭时使用免费的UAPI进行搜索）
   enabled: true
-  # Tavily API 密钥，从 https://app.tavily.com/home 获取。如果你有霍格沃兹环境请使用自己的密钥。
+  # Tavily API 密钥，从 https://app.tavily.com/home 获取。如果你有霍格沃兹环境请使用自己的密钥
   api_key: "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"
-  # Tavily API 代理地址，用于解决国内网络访问问题，留空则使用官方地址。我简直算是为了这个代理而买了一个域名QWQ(求赞助)。
+  # Tavily API 代理地址，用于解决国内网络访问问题，留空则使用官方地址。我简直算是为了这个代理而买了一个域名QWQ(求赞助)
   proxy_url: "https://tavilyproxy.baicaizhale.top" 
   # 搜索结果数量限制（1-10）
   max_results: 5
