@@ -1314,7 +1314,7 @@ public class CLIManager {
         // 如果是 YOLO 模式，风险命令需要确认
         if (session != null && session.getMode() == DialogueSession.Mode.YOLO) {
             if (isRiskyCommand(cleanCommand)) {
-                player.sendMessage(ChatColor.YELLOW + "⨀ 检测到风险命令，已暂停，请确认");
+                player.sendMessage(ChatColor.YELLOW + "⨀ 检测到风险命令，执行可能带来无法挽回的后果，请检查命令");
                 pendingCommands.put(uuid, cleanCommand);
                 generationStates.put(uuid, GenerationStatus.WAITING_CONFIRM);
                 sendConfirmButtons(player, cleanCommand);
