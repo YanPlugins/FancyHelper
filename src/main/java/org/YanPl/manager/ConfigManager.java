@@ -355,6 +355,14 @@ public class ConfigManager {
     }
 
     /**
+     * 获取是否启用猫娘模式
+     * @return 是否启用猫娘模式
+     */
+    public boolean isMeowEnabled() {
+        return config.getBoolean("settings.meow", false);
+    }
+
+    /**
      * 获取玩家数据配置对象
      * @return FileConfiguration
      */

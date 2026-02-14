@@ -1,10 +1,12 @@
 # 配置版本，请勿修改
-version: 3.3.1
+version: 3.4.0
 
 # 插件设置
 settings:
   # 是否启用调试模式，启用后会在控制台输出详细调试信息
   debug: false
+  # 是否启用猫娘模式（开启后 Fancy 将同时扮演猫娘角色）
+  meow: false
   # 补充系统提示词（会自动追加到基础系统提示词后面）
   supplementary_prompt: ""
   # CLI 模式会话的自动过期时间 （以分钟为单位）
