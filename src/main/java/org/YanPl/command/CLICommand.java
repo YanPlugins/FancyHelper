@@ -295,9 +295,9 @@ public class CLICommand implements CommandExecutor, TabCompleter {
             }
             pluginManager.enablePlugin(reloadPlugin);
 
-            sender.sendMessage(ChatColor.GREEN + "已启动深度重载服务，请留意控制台输出...");
+            sender.sendMessage(ChatColor.GREEN + "§l§bFancyHelper§b§r §7> §f正在深度重载，可能需要20s左右的时间等待响应");
         } catch (Exception e) {
-            sender.sendMessage(ChatColor.RED + "启动重载服务时发生错误: " + e.getMessage());
+            sender.sendMessage(ChatColor.RED + "§l§bFancyHelper§b§r §7> §f启动重载服务时发生错误: " + e.getMessage());
             e.printStackTrace();
             plugin.getCloudErrorReport().report(e);
         }
