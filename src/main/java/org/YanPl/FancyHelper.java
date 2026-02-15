@@ -121,6 +121,9 @@ public final class FancyHelper extends JavaPlugin {
             // 检查 server.properties 中的安全配置并提示
             checkSecureProfile();
 
+            // 检测是否为 Spigot 服务端（非 Paper 及下游），显示警告
+            checkSpigotServer();
+
             // 打印启动 ASCII 艺术（模仿 LuckPerms 风格，包含颜色）
             // 使用 ANSI 颜色代码：\u001B[38;5;81m 天蓝色, \u001B[38;5;208m 橙色, \u001B[36m 青色, \u001B[38;5;155m 灰色, \u001B[0m 重置
             getLogger().info(" \u001B[38;5;81m_\u001B[0m       ");
@@ -245,6 +248,63 @@ public final class FancyHelper extends JavaPlugin {
             }
         } catch (Exception e) {
             // 反射调用可能失败，可安全忽略
+        }
+    }
+
+    /**
+     * 检测是否为 Spigot 服务端（非 Paper 及下游分支），如果是则显示警告。
+     * Paper 及其下游分支（如 Purpur、Pufferfish 等）通常具有更好的性能和 API 支持。
+     */
+    private void checkSpigotServer() {
+        String serverName = getServer().getName();
+        String serverVersion = getServer().getVersion();
+        
+        // 检测是否为 Paper 及其下游分支
+        // Paper 服务端名称通常包含 "Paper"，下游分支如 Purpur、Pufferfish 等也基于 Paper
+        boolean isPaperOrFork = false;
+        
+        // 方法1：检查服务端名称
+        String lowerName = serverName.toLowerCase();
+        if (lowerName.contains("paper") || lowerName.contains("purpur") || 
+            lowerName.contains("pufferfish") || lowerName.contains("airplane") ||
+            lowerName.contains("tuinity") || lowerName.contains("empirecraft")) {
+            isPaperOrFork = true;
+        }
+        
+        // 方法2：检查版本字符串
+        if (!isPaperOrFork) {
+            String lowerVersion = serverVersion.toLowerCase();
+            if (lowerVersion.contains("paper") || lowerVersion.contains("purpur") || 
+                lowerVersion.contains("pufferfish") || lowerVersion.contains("airplane") ||
+                lowerVersion.contains("tuinity") || lowerVersion.contains("empirecraft")) {
+                isPaperOrFork = true;
+            }
+        }
+        
+        // 方法3：通过反射检测 Paper 特有的类
+        if (!isPaperOrFork) {
+            try {
+                // Paper 1.16+ 有这个特有类
+                Class.forName("com.destroystokyo.paper.PaperConfig");
+                isPaperOrFork = true;
+            } catch (ClassNotFoundException ignored) {
+                try {
+                    // Paper 1.20.5+ 使用新的配置类路径
+                    Class.forName("io.papermc.paper.configuration.Configuration");
+                    isPaperOrFork = true;
+                } catch (ClassNotFoundException ignored2) {
+                    // 不是 Paper
+                }
+            }
+        }
+        
+        // 如果检测到是 Spigot（非 Paper 及下游），显示警告
+        if (!isPaperOrFork && (lowerName.contains("spigot") || lowerName.contains("craftbukkit"))) {
+            getLogger().warning("====================");
+            getLogger().warning("您正在使用 Spigot 服务端，可能导致一些奇怪的问题。");
+            getLogger().warning("可以考虑转移到 Paper 服务端来解决哦。");
+            getLogger().warning("Paper 服务端地址: https://papermc.io/");
+            getLogger().warning("====================");
         }
     }
 
