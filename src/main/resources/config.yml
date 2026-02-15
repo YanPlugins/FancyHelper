@@ -6,7 +6,7 @@ settings:
   # 是否启用调试模式，启用后会在控制台输出详细调试信息
   debug: false
   # 是否启用猫娘模式，启用后Fancy将扮演猫娘，注意某些模型(特别是国产模型)可能会拒绝这个要求
-  meow: false
+  meow: true
   # 补充系统提示词（会自动追加到基础系统提示词后面，不会就留空）
   supplementary_prompt: ""
   # CLI 模式会话的自动过期时间 （以分钟为单位）
@@ -85,7 +85,7 @@ openai:
   #   - 阿里云通义千问: qwen3-max
   model: gpt-4o
 
-# Metaso AI 搜索配置（秘塔AI搜索API，提供更强大的AI网络搜索能力）
+# Metaso AI 搜索配置（秘塔AI搜索API，提供更强大的AI网络搜索能力，开启时优先级最高）
 metaso:
   # 是否启用 Metaso AI 搜索（默认关闭，启用后将使用 Metaso API 进行 AI 搜索）
   enabled: false
