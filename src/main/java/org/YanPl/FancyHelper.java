@@ -127,6 +127,9 @@ public final class FancyHelper extends JavaPlugin {
             getLogger().info(" |_|   |_| |_|");
 
             getLogger().info("FancyHelper 已启用！");
+
+            // 尝试同步命令，修复热重载后的 Brigadier 缓存问题
+            syncCommands();
         } catch (Throwable e) {
             getLogger().severe("FancyHelper 启动失败: " + e.getMessage());
             e.printStackTrace();
@@ -355,22 +358,53 @@ public final class FancyHelper extends JavaPlugin {
             knownCommandsField.setAccessible(true);
             Map<String, Command> knownCommands = (Map<String, Command>) knownCommandsField.get(commandMap);
 
-            Iterator<Map.Entry<String, Command>> it = knownCommands.entrySet().iterator();
-            while (it.hasNext()) {
-                Map.Entry<String, Command> entry = it.next();
+            // 使用 key set 遍历并收集需要删除的 key，避免迭代器 UnsupportedOperationException
+            java.util.List<String> keysToRemove = new java.util.ArrayList<>();
+            for (Map.Entry<String, Command> entry : knownCommands.entrySet()) {
                 Command cmd = entry.getValue();
                 if (cmd instanceof PluginCommand) {
                     PluginCommand pluginCommand = (PluginCommand) cmd;
                     if (pluginCommand.getPlugin().equals(this)) {
-                        it.remove();
+                        keysToRemove.add(entry.getKey());
                     }
                 }
             }
+
+            for (String key : keysToRemove) {
+                knownCommands.remove(key);
+                // getLogger().info("已注销命令: " + key);
+            }
         } catch (Exception e) {
-            getLogger().warning("注销命令失败: " + e.getMessage());
+            getLogger().warning("注销命令失败: " + e.getClass().getName() + ": " + e.getMessage());
             if (cloudErrorReport != null) {
                 cloudErrorReport.report(e);
             }
+        }
+    }
+
+    /**
+     * 强制同步服务器命令（刷新 Brigadier 命令树），修复热重载后命令失效的问题。
+     * 这通常是 Paper 1.20+ 环境下的必需操作。
+     */
+    private void syncCommands() {
+        try {
+            // 延迟一 tick 执行，确保插件完全加载后再同步
+            Bukkit.getScheduler().runTask(this, () -> {
+                try {
+                    Object server = Bukkit.getServer();
+                    // 仅在 CraftServer 上尝试调用 syncCommands
+                    if (server.getClass().getName().contains("CraftServer")) {
+                        java.lang.reflect.Method method = server.getClass().getDeclaredMethod("syncCommands");
+                        method.setAccessible(true);
+                        method.invoke(server);
+                        // getLogger().info("已尝试同步命令以刷新缓存。");
+                    }
+                } catch (Throwable t) {
+                    getLogger().warning("同步命令失败 (syncCommands): " + t.getMessage());
+                }
+            });
+        } catch (Throwable t) {
+            // 忽略调度失败
         }
     }
 }
