@@ -17,7 +17,14 @@ import org.YanPl.manager.FileWatcherManager;
 import org.YanPl.util.CloudErrorReport;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
+import org.bukkit.command.Command;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.command.SimpleCommandMap;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.lang.reflect.Field;
+import java.util.Iterator;
+import java.util.Map;
 
 /**
  * 插件主类：初始化各管理器并注册命令/事件。
@@ -39,83 +46,92 @@ public final class FancyHelper extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        // 初始化云端错误上报
-        cloudErrorReport = new CloudErrorReport(this);
+        try {
+            // 初始化云端错误上报
+            cloudErrorReport = new CloudErrorReport(this);
 
-        // 执行旧插件清理（清理带有 mineagent 关键词的文件）
-        cleanOldPluginFiles();
+            // 执行旧插件清理（清理带有 mineagent 关键词的文件）
+            cleanOldPluginFiles();
 
-        // 初始化 EULA 管理器（优先于配置，以便更新时强制替换 EULA）
-        eulaManager = new EulaManager(this);
+            // 初始化 EULA 管理器（优先于配置，以便更新时强制替换 EULA）
+            eulaManager = new EulaManager(this);
 
-        // 初始化配置管理器
-        configManager = new ConfigManager(this);
-        
-        // 初始化验证管理器
-        verificationManager = new VerificationManager(this);
-        
-        // 检查 ProtocolLib 依赖并初始化数据包捕获管理器
-        if (getServer().getPluginManager().isPluginEnabled("ProtocolLib")) {
-            // 初始化数据包捕获管理器
-            packetCaptureManager = new PacketCaptureManager(this);
-            getLogger().info("已检测到 ProtocolLib，启用高级功能。");
-        } else {
-            getLogger().warning("==================");
-            getLogger().warning("未检测到 ProtocolLib！");
-            getLogger().warning("FancyHelper 的部分高级功能（如命令输出捕获）将无法使用。");
-            getLogger().warning("建议前往 https://www.spigotmc.org/resources/protocollib.1997/ 下载并安装以获得最佳体验。");
-            getLogger().warning("==================");
-            packetCaptureManager = null;
+            // 初始化配置管理器
+            configManager = new ConfigManager(this);
+            
+            // 初始化验证管理器
+            verificationManager = new VerificationManager(this);
+            
+            // 检查 ProtocolLib 依赖并初始化数据包捕获管理器
+            if (getServer().getPluginManager().isPluginEnabled("ProtocolLib")) {
+                initPacketCapture();
+            } else {
+                getLogger().warning("==================");
+                getLogger().warning("未检测到 ProtocolLib！");
+                getLogger().warning("FancyHelper 的部分高级功能（如命令输出捕获）将无法使用。");
+                getLogger().warning("建议前往 https://www.spigotmc.org/resources/protocollib.1997/ 下载并安装以获得最佳体验。");
+                getLogger().warning("==================");
+                packetCaptureManager = null;
+            }
+            
+            // 异步索引服务器命令与预设文件
+            workspaceIndexer = new WorkspaceIndexer(this);
+            Bukkit.getScheduler().runTaskAsynchronously(this, () -> workspaceIndexer.indexAll());
+
+            // 初始化待办管理器
+            todoManager = new TodoManager(this);
+
+            // 初始化 CLI 管理器（管理玩家的 AI 会话）
+            cliManager = new CLIManager(this);
+
+            // 初始化更新管理器并检查更新
+            updateManager = new UpdateManager(this);
+            updateManager.checkForUpdates();
+
+            // 初始化公告管理器（构造函数中会自动开始定期获取公告）
+            noticeManager = new NoticeManager(this);
+
+            // 初始化文件监听管理器
+            fileWatcherManager = new FileWatcherManager(this);
+
+            // 初始化 Tavily API
+            tavilyAPI = new TavilyAPI(this);
+
+            // 初始化 Metaso API
+            metasoAPI = new MetasoAPI(this);
+
+            CLICommand cliCommand = new CLICommand(this);
+            PluginCommand command = getCommand("fancyhelper");
+            if (command != null) {
+                command.setExecutor(cliCommand);
+                command.setTabCompleter(cliCommand);
+            } else {
+                getLogger().severe("无法注册命令 'fancyhelper' - 请检查 plugin.yml！");
+            }
+
+            // 注册事件监听器
+            getServer().getPluginManager().registerEvents(new ChatListener(this), this);
+
+            // bStats 统计
+            int pluginId = 29036;
+            new Metrics(this, pluginId);
+
+            // 检查 server.properties 中的安全配置并提示
+            checkSecureProfile();
+
+            // 打印启动 ASCII 艺术
+            getLogger().info("  _____ _   _ ");
+            getLogger().info(" |  ___| | | |");
+            getLogger().info(" | |_  | |_| |");
+            getLogger().info(" |  _| |  _  |");
+            getLogger().info(" |_|   |_| |_|");
+
+            getLogger().info("FancyHelper 已启用！");
+        } catch (Throwable e) {
+            getLogger().severe("FancyHelper 启动失败: " + e.getMessage());
+            e.printStackTrace();
+            setEnabled(false);
         }
-        
-        // 异步索引服务器命令与预设文件
-        workspaceIndexer = new WorkspaceIndexer(this);
-        Bukkit.getScheduler().runTaskAsynchronously(this, () -> workspaceIndexer.indexAll());
-
-        // 初始化待办管理器
-        todoManager = new TodoManager(this);
-
-        // 初始化 CLI 管理器（管理玩家的 AI 会话）
-        cliManager = new CLIManager(this);
-
-        // 初始化更新管理器并检查更新
-        updateManager = new UpdateManager(this);
-        updateManager.checkForUpdates();
-
-        // 初始化公告管理器（构造函数中会自动开始定期获取公告）
-        noticeManager = new NoticeManager(this);
-
-        // 初始化文件监听管理器
-        fileWatcherManager = new FileWatcherManager(this);
-
-        // 初始化 Tavily API
-        tavilyAPI = new TavilyAPI(this);
-
-        // 初始化 Metaso API
-        metasoAPI = new MetasoAPI(this);
-
-        CLICommand cliCommand = new CLICommand(this);
-        getCommand("fancyhelper").setExecutor(cliCommand);
-        getCommand("fancyhelper").setTabCompleter(cliCommand);
-
-        // 注册事件监听器
-        getServer().getPluginManager().registerEvents(new ChatListener(this), this);
-
-        // bStats 统计
-        int pluginId = 29036;
-        new Metrics(this, pluginId);
-
-        // 检查 server.properties 中的安全配置并提示
-        checkSecureProfile();
-
-        // 打印启动 ASCII 艺术
-        getLogger().info("  _____ _   _ ");
-        getLogger().info(" |  ___| | | |");
-        getLogger().info(" | |_  | |_| |");
-        getLogger().info(" |  _| |  _  |");
-        getLogger().info(" |_|   |_| |_|");
-
-        getLogger().info("FancyHelper 已启用！");
     }
 
 // 下面一些代码只是为了清理旧插件防止干扰，没有任何恶意
@@ -229,9 +245,18 @@ public final class FancyHelper extends JavaPlugin {
         }
     }
 
+    private void initPacketCapture() {
+        // 初始化数据包捕获管理器
+        packetCaptureManager = new PacketCaptureManager(this);
+        getLogger().info("已检测到 ProtocolLib，启用高级功能。");
+    }
+
     @Override
     public void onDisable() {
         getLogger().info("FancyHelper 正在禁用...");
+
+        // 注销命令，防止重载后命令指向旧插件实例
+        unregisterCommands();
 
         // 关闭 CLI 管理器，释放资源
         if (cliManager != null) {
@@ -314,5 +339,38 @@ public final class FancyHelper extends JavaPlugin {
 
     public MetasoAPI getMetasoAPI() {
         return metasoAPI;
+    }
+
+    /**
+     * 从 CommandMap 中移除本插件注册的命令，避免重载后出现重复注册或旧引用残留。
+     */
+    @SuppressWarnings("unchecked")
+    private void unregisterCommands() {
+        try {
+            Field commandMapField = Bukkit.getServer().getClass().getDeclaredField("commandMap");
+            commandMapField.setAccessible(true);
+            SimpleCommandMap commandMap = (SimpleCommandMap) commandMapField.get(Bukkit.getServer());
+
+            Field knownCommandsField = SimpleCommandMap.class.getDeclaredField("knownCommands");
+            knownCommandsField.setAccessible(true);
+            Map<String, Command> knownCommands = (Map<String, Command>) knownCommandsField.get(commandMap);
+
+            Iterator<Map.Entry<String, Command>> it = knownCommands.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<String, Command> entry = it.next();
+                Command cmd = entry.getValue();
+                if (cmd instanceof PluginCommand) {
+                    PluginCommand pluginCommand = (PluginCommand) cmd;
+                    if (pluginCommand.getPlugin().equals(this)) {
+                        it.remove();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            getLogger().warning("注销命令失败: " + e.getMessage());
+            if (cloudErrorReport != null) {
+                cloudErrorReport.report(e);
+            }
+        }
     }
 }
