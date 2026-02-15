@@ -53,6 +53,9 @@ public final class FancyHelper extends JavaPlugin {
             // 执行旧插件清理（清理带有 mineagent 关键词的文件）
             cleanOldPluginFiles();
 
+            // 释放热重载服务 jar 到 plugins/FancyHelper/lib
+            saveResource("lib/FancyHelperReloadService.jar", true);
+
             // 初始化 EULA 管理器（优先于配置，以便更新时强制替换 EULA）
             eulaManager = new EulaManager(this);
 

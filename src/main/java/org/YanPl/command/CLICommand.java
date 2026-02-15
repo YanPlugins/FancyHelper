@@ -276,58 +276,42 @@ public class CLICommand implements CommandExecutor, TabCompleter {
     private void handleDeepReload(CommandSender sender) {
         PluginManager pluginManager = Bukkit.getPluginManager();
 
-        // 优先检查是否有 PlugMan 插件，利用成熟插件进行重载更安全
-        Plugin plugMan = pluginManager.getPlugin("PlugMan");
-        if (plugMan == null) {
-            plugMan = pluginManager.getPlugin("PlugManX");
+        // 不再调用 PlugMan，而是使用内置的热重载服务
+        File libDir = new File(plugin.getDataFolder(), "lib");
+        if (!libDir.exists()) {
+            libDir.mkdirs();
         }
+        File reloadServiceJar = new File(libDir, "FancyHelperReloadService.jar");
 
-        if (plugMan != null && plugMan.isEnabled()) {
-            sender.sendMessage(ChatColor.GREEN + "检测到 " + plugMan.getName() + "，正在调用其重载指令...");
-            // 尝试执行 /plm reload FancyHelper 或 /plugman reload FancyHelper
-            String reloadCmd = (plugMan.getName().equalsIgnoreCase("PlugManX") ? "plm" : "plugman")
-                    + " reload " + plugin.getName();
-            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), reloadCmd);
+        if (!reloadServiceJar.exists()) {
+            sender.sendMessage(ChatColor.RED + "Deep reload failed: Helper jar not found at " + reloadServiceJar.getAbsolutePath());
             return;
         }
-
-        if (isModernPaperPluginSystem()) {
-            sender.sendMessage(ChatColor.RED + "检测到 Paper 现代插件系统：运行时卸载/重载 Bukkit 插件会被阻止。");
-            sender.sendMessage(ChatColor.YELLOW + "请改用重启服务器来重新加载插件文件（例如使用 /restart）。");
-            return;
-        }
-
-        File pluginsDir = plugin.getDataFolder().getParentFile();
-        if (pluginsDir == null || !pluginsDir.exists() || !pluginsDir.isDirectory()) {
-            sender.sendMessage(ChatColor.RED + "无法定位 plugins 目录，深度重载已取消。");
-            return;
-        }
-
-        File jarFile = findReloadJarFile(pluginsDir);
-        if (jarFile == null || !jarFile.isFile()) {
-            sender.sendMessage(ChatColor.RED + "未找到可用于重新加载的插件 jar 文件（需位于 plugins 目录）。");
-            return;
-        }
-
-        sender.sendMessage(ChatColor.YELLOW + "正在深度重载 FancyHelper...");
-        sender.sendMessage(ChatColor.GRAY + "目标文件: " + jarFile.getName());
 
         try {
-            unregisterPluginCommands(plugin);
-            HandlerList.unregisterAll(plugin);
-            Bukkit.getScheduler().cancelTasks(plugin);
+            // 尝试加载或获取已加载的重载服务插件
+            Plugin reloadPlugin = pluginManager.getPlugin("FancyHelperReloadService");
+            if (reloadPlugin == null) {
+                reloadPlugin = pluginManager.loadPlugin(reloadServiceJar);
+            }
 
-            pluginManager.disablePlugin(plugin);
-            forceRemovePluginFromManager(pluginManager, plugin);
-            closePluginClassLoader(plugin);
+            if (reloadPlugin == null) {
+                sender.sendMessage(ChatColor.RED + "Deep reload failed: Could not load FancyHelperReloadService.");
+                return;
+            }
 
-            Plugin reloaded = pluginManager.loadPlugin(jarFile);
-            pluginManager.enablePlugin(reloaded);
+            // 确保启用该插件以触发其内部的重载逻辑
+            if (reloadPlugin.isEnabled()) {
+                // 如果已启用，先禁用再启用以触发 onEnable
+                pluginManager.disablePlugin(reloadPlugin);
+            }
+            pluginManager.enablePlugin(reloadPlugin);
 
-            sender.sendMessage(ChatColor.GREEN + "深度重载完成: " + reloaded.getDescription().getFullName());
-        } catch (Throwable t) {
-            plugin.getCloudErrorReport().report(t);
-            sender.sendMessage(ChatColor.RED + "深度重载失败: " + t.getClass().getSimpleName() + " - " + (t.getMessage() == null ? "无错误信息" : t.getMessage()));
+            sender.sendMessage(ChatColor.GREEN + "已启动深度重载服务，请留意控制台输出...");
+        } catch (Exception e) {
+            sender.sendMessage(ChatColor.RED + "启动重载服务时发生错误: " + e.getMessage());
+            e.printStackTrace();
+            plugin.getCloudErrorReport().report(e);
         }
     }
 
