@@ -271,11 +271,8 @@ public class UpdateManager implements Listener {
                     plugin.getLogger().info("准备执行自动重载...");
                     if (!plugin.isEnabled()) return;
                     Bukkit.getScheduler().runTask(plugin, () -> {
-                        if (sender != null) {
-                            sender.performCommand("fancy reload deeply");
-                        } else {
-                            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "fancy reload deeply");
-                        }
+                        // 强制使用控制台执行深度重载，避免权限或上下文问题
+                        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "fancy reload deeply");
                     });
                 }
             } catch (IOException e) {
