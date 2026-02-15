@@ -11,26 +11,14 @@ import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.PluginCommand;
-import org.bukkit.command.SimpleCommandMap;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
-import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
-import org.bukkit.plugin.SimplePluginManager;
-
 import java.io.File;
-import java.lang.reflect.Field;
-import java.net.URI;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -312,145 +300,6 @@ public class CLICommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.RED + "启动重载服务时发生错误: " + e.getMessage());
             e.printStackTrace();
             plugin.getCloudErrorReport().report(e);
-        }
-    }
-
-    /**
-     * 判断当前是否运行在 Paper 的“现代插件系统”上。
-     * 该系统会阻止运行时重复加载同一插件标识符，导致热重载（unload/load）失败。
-     */
-    private boolean isModernPaperPluginSystem() {
-        try {
-            Class.forName("io.papermc.paper.plugin.manager.PaperPluginManagerImpl");
-            return true;
-        } catch (ClassNotFoundException ignored) {
-            return false;
-        }
-    }
-
-    /**
-     * 在 plugins 目录中挑选最合适的 FancyHelper jar 文件用于重新加载。
-     * 优先选择文件名包含 fancyhelper 或插件名的 jar，且按最后修改时间降序。
-     */
-    private File findReloadJarFile(File pluginsDir) {
-        String pluginNameLower = plugin.getDescription().getName().toLowerCase();
-
-        File[] jars = pluginsDir.listFiles((dir, name) -> name.toLowerCase().endsWith(".jar"));
-        if (jars == null || jars.length == 0) {
-            return null;
-        }
-
-        List<File> preferred = Arrays.stream(jars)
-                .filter(File::isFile)
-                .filter(f -> {
-                    String n = f.getName().toLowerCase();
-                    return n.contains("fancyhelper") || n.contains(pluginNameLower);
-                })
-                .sorted(Comparator.comparingLong(File::lastModified).reversed())
-                .collect(Collectors.toList());
-
-        if (!preferred.isEmpty()) {
-            return preferred.get(0);
-        }
-
-        File current = getCurrentJarFile();
-        if (current != null && current.isFile() && pluginsDir.equals(current.getParentFile())) {
-            return current;
-        }
-
-        return null;
-    }
-
-    /**
-     * 获取当前运行中的插件 jar 文件（从 Class ProtectionDomain 推断）。
-     */
-    private File getCurrentJarFile() {
-        try {
-            URL jarUrl = plugin.getClass().getProtectionDomain().getCodeSource().getLocation();
-            URI jarUri = jarUrl.toURI();
-            File jarFile = new File(jarUri);
-            return jarFile.isFile() ? jarFile : null;
-        } catch (Exception e) {
-            plugin.getCloudErrorReport().report(e);
-            return null;
-        }
-    }
-
-    /**
-     * 从 CommandMap 中移除本插件注册的命令，避免重载后出现重复注册或旧引用残留。
-     */
-    @SuppressWarnings("unchecked")
-    private void unregisterPluginCommands(Plugin targetPlugin) {
-        try {
-            Field commandMapField = Bukkit.getServer().getClass().getDeclaredField("commandMap");
-            commandMapField.setAccessible(true);
-            SimpleCommandMap commandMap = (SimpleCommandMap) commandMapField.get(Bukkit.getServer());
-
-            Field knownCommandsField = SimpleCommandMap.class.getDeclaredField("knownCommands");
-            knownCommandsField.setAccessible(true);
-            Map<String, Command> knownCommands = (Map<String, Command>) knownCommandsField.get(commandMap);
-
-            Iterator<Map.Entry<String, Command>> it = knownCommands.entrySet().iterator();
-            while (it.hasNext()) {
-                Map.Entry<String, Command> entry = it.next();
-                Command cmd = entry.getValue();
-                if (cmd instanceof PluginCommand) {
-                    PluginCommand pluginCommand = (PluginCommand) cmd;
-                    if (pluginCommand.getPlugin().equals(targetPlugin)) {
-                        it.remove();
-                    }
-                }
-            }
-        } catch (Exception e) {
-            plugin.getCloudErrorReport().report(e);
-        }
-    }
-
-    /**
-     * 从 SimplePluginManager 的内部容器中移除插件引用，尽量降低“假卸载”残留。
-     */
-    @SuppressWarnings("unchecked")
-    private void forceRemovePluginFromManager(PluginManager pluginManager, Plugin targetPlugin) {
-        if (!(pluginManager instanceof SimplePluginManager)) {
-            return;
-        }
-
-        try {
-            SimplePluginManager spm = (SimplePluginManager) pluginManager;
-
-            Field pluginsField = SimplePluginManager.class.getDeclaredField("plugins");
-            pluginsField.setAccessible(true);
-            List<Plugin> plugins = (List<Plugin>) pluginsField.get(spm);
-            plugins.remove(targetPlugin);
-
-            Field lookupNamesField = SimplePluginManager.class.getDeclaredField("lookupNames");
-            lookupNamesField.setAccessible(true);
-            Map<String, Plugin> lookupNames = (Map<String, Plugin>) lookupNamesField.get(spm);
-            lookupNames.remove(targetPlugin.getName());
-        } catch (Exception e) {
-            plugin.getCloudErrorReport().report(e);
-        }
-    }
-
-    /**
-     * 尝试关闭插件的 ClassLoader（若底层为 URLClassLoader/PluginClassLoader），释放 jar 文件句柄以便重新加载。
-     */
-    private void closePluginClassLoader(Plugin targetPlugin) {
-        try {
-            ClassLoader classLoader = targetPlugin.getClass().getClassLoader();
-            if (classLoader instanceof URLClassLoader) {
-                ((URLClassLoader) classLoader).close();
-                return;
-            }
-
-            try {
-                java.lang.reflect.Method closeMethod = classLoader.getClass().getMethod("close");
-                closeMethod.setAccessible(true);
-                closeMethod.invoke(classLoader);
-            } catch (NoSuchMethodException ignored) {
-            }
-        } catch (Throwable t) {
-            plugin.getCloudErrorReport().report(t);
         }
     }
 
