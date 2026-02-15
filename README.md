@@ -1,6 +1,6 @@
 # FancyHelper
 
-<img src="pic/image.jpg" alt="FancyHelper Logo" width="50%">
+<img src="pic/image.webp" alt="FancyHelper Logo" width="50%">
 
 FancyHelper 是一款基于 AI 驱动的 Minecraft 服务器管理助手插件。它允许管理员通过简单的自然语言与 AI 对话，自动生成并执行复杂的服务器指令，极大地降低了插件学习成本和管理负担。
 
@@ -184,9 +184,9 @@ mvn clean package
 
 为铸FancyHelper，吾等焚膏继晷，兀兀穷年，耗尽心血。若此物有幸助君一臂之力，不知可否邀君共饮一杯薄酒，或赐一盏清茶之资？
 
-**baicaizhale**![baicaizhale](./pic/Sponsor-baicaizhale.png)
+**baicaizhale**![baicaizhale](./pic/Sponsor-baicaizhale.webp)
 
-**zip8919**![zip8919](./pic/Sponsor-zip8919.jpg)
+**zip8919**![zip8919](./pic/Sponsor-zip8919.webp)
 
 ---
 
