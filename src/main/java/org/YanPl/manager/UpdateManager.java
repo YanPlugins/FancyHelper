@@ -114,8 +114,12 @@ public class UpdateManager implements Listener {
                         }
                     } else {
                         hasUpdate = false;
+                        // 无论 sender 是否为 null，都输出检查结果
+                        String message = "§l§bFancyHelper§b§r §7> §f当前已是最新版本 (v" + currentVersion + ")";
                         if (sender != null) {
-                            sender.sendMessage("§l§bFancyHelper§b§r §7> §f当前已是最新版本 (v" + currentVersion + ")");
+                            sender.sendMessage(message);
+                        } else {
+                            Bukkit.getConsoleSender().sendMessage(message);
                         }
                     }
                 } else {
