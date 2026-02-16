@@ -15,6 +15,7 @@ import org.YanPl.manager.TodoManager;
 import org.YanPl.manager.NoticeManager;
 import org.YanPl.manager.FileWatcherManager;
 import org.YanPl.util.CloudErrorReport;
+import org.YanPl.util.ErrorHandler;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -42,12 +43,16 @@ public final class FancyHelper extends JavaPlugin {
     private FileWatcherManager fileWatcherManager;
     private TavilyAPI tavilyAPI;
     private MetasoAPI metasoAPI;
+    private ErrorHandler errorHandler;
 
     @Override
     public void onEnable() {
         try {
             // 初始化云端错误上报
             cloudErrorReport = new CloudErrorReport(this);
+            
+            // 初始化统一错误处理器
+            errorHandler = new ErrorHandler(this);
 
             // 执行旧插件清理（清理带有 mineagent 关键词的文件）
             cleanOldPluginFiles();
@@ -409,6 +414,10 @@ public final class FancyHelper extends JavaPlugin {
 
     public MetasoAPI getMetasoAPI() {
         return metasoAPI;
+    }
+
+    public ErrorHandler getErrorHandler() {
+        return errorHandler;
     }
 
     /**

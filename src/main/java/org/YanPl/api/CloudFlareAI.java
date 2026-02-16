@@ -22,17 +22,19 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * CloudFlare AI API 封装类
+ * 负责构建请求、解析响应，以及管理 HttpClient 的生命周期
+ */
 public class CloudFlareAI {
-    /**
-     * 使用 Java 标准库 HttpClient 封装 CloudFlare AI HTTP 调用
-     * 负责构建请求、解析响应，以及管理 HttpClient 的生命周期。
-     */
     private static final String API_COMPLETIONS_URL = "https://api.cloudflare.com/client/v4/accounts/%s/ai/v1/chat/completions";
     private static final String API_RESPONSES_URL = "https://api.cloudflare.com/client/v4/accounts/%s/ai/v1/responses";
     private static final String ACCOUNTS_URL = "https://api.cloudflare.com/client/v4/accounts";
+    
     private final FancyHelper plugin;
     private final HttpClient httpClient;
     private final Gson gson = new Gson();
+    private final ResponseParser responseParser = new ResponseParser();
     private String cachedAccountId = null;
 
     public CloudFlareAI(FancyHelper plugin) {
@@ -312,54 +314,14 @@ public class CloudFlareAI {
             }
 
             JsonObject responseJson = gson.fromJson(responseBody, JsonObject.class);
-            String textContent = null;
-            String thoughtContent = null;
-
-            // 解析 OpenAI 标准格式 (choices 数组)
-            if (responseJson.has("choices") && responseJson.get("choices").isJsonArray()) {
-                JsonArray choices = responseJson.getAsJsonArray("choices");
-                if (choices.size() > 0) {
-                    JsonObject choice = choices.get(0).getAsJsonObject();
-                    if (choice.has("message")) {
-                        JsonObject message = choice.getAsJsonObject("message");
-                        if (message.has("content") && !message.get("content").isJsonNull()) {
-                            textContent = message.get("content").getAsString();
-                        }
-                        
-                        // 兼容多种思考内容字段名 (OpenAI/DeepSeek/Qwen 等)
-                        if (message.has("reasoning_content") && !message.get("reasoning_content").isJsonNull()) {
-                            thoughtContent = message.get("reasoning_content").getAsString();
-                        } else if (message.has("reasoning") && !message.get("reasoning").isJsonNull()) {
-                            thoughtContent = message.get("reasoning").getAsString();
-                        } else if (message.has("thought") && !message.get("thought").isJsonNull()) {
-                            thoughtContent = message.get("thought").getAsString();
-                        }
-                    }
-                    
-                    // 某些 API 可能将 reasoning 放在 choice 级别而非 message 级别
-                    if (thoughtContent == null) {
-                        if (choice.has("reasoning_content") && !choice.get("reasoning_content").isJsonNull()) {
-                            thoughtContent = choice.get("reasoning_content").getAsString();
-                        } else if (choice.has("reasoning") && !choice.get("reasoning").isJsonNull()) {
-                            thoughtContent = choice.get("reasoning").getAsString();
-                        }
-                    }
-                }
-            }
-
-            // 如果 content 为空但存在思考内容或工具调用（此处主要针对正文缺失的情况）
-            if (textContent == null || textContent.trim().isEmpty()) {
-                // 如果有思考内容，尝试将其作为响应的一部分返回，或者至少返回一个空字符串避免报错
-                if (thoughtContent != null && !thoughtContent.isEmpty()) {
-                    textContent = ""; // 允许空正文，只要有思考过程
-                }
-            }
-
-            if (textContent != null) {
+            AIResponse aiResponse = responseParser.parseResponse(responseJson);
+            
+            if (aiResponse != null && aiResponse.getContent() != null) {
+                String thoughtContent = aiResponse.getThought();
                 if (thoughtContent != null && !thoughtContent.isEmpty()) {
                     plugin.getLogger().info("[AI] 检测到思考内容 (长度: " + thoughtContent.length() + ")");
                 }
-                return new AIResponse(textContent, thoughtContent);
+                return aiResponse;
             }
 
             throw new IOException("无法解析 OpenAI API 响应结果: " + responseBody);
@@ -456,262 +418,23 @@ public class CloudFlareAI {
                 // 如果是 400 (常见于 payload 错误) 或 500 (常见于推理模型参数不兼容)，尝试使用最简 payload 重试
                 if ((response.statusCode() == 400 || response.statusCode() == 500) && responseBody != null) {
                     plugin.getLogger().warning("[AI] 检测到 CF API 错误 " + response.statusCode() + "，正在尝试使用简化载荷重试...");
-
-                    JsonArray simpleInput = new JsonArray();
-                    JsonObject simpleSystem = new JsonObject();
-                    simpleSystem.addProperty("role", "system");
-                    simpleSystem.addProperty("content", "你是一个得力的助手。");
-                    simpleInput.add(simpleSystem);
-
-                    String lastUser = null;
-                    List<DialogueSession.Message> hist = new ArrayList<>(session.getHistory());
-                    for (int i = hist.size() - 1; i >= 0; i--) {
-                        DialogueSession.Message mm = hist.get(i);
-                        if (mm != null && mm.getRole() != null && mm.getRole().equalsIgnoreCase("user") && mm.getContent() != null && !mm.getContent().trim().isEmpty()) {
-                            lastUser = mm.getContent().trim();
-                            break;
-                        }
-                    }
-                    if (lastUser == null || lastUser.isEmpty()) lastUser = "Hello";
-
-                    JsonObject simpleUser = new JsonObject();
-                    simpleUser.addProperty("role", "user");
-                    simpleUser.addProperty("content", lastUser);
-                    simpleInput.add(simpleUser);
-
-                    JsonObject simpleBody = new JsonObject();
-                    simpleBody.addProperty("model", model);
-                    simpleBody.addProperty("max_tokens", 4096);
-
-                    if (useResponsesApi) {
-                        simpleBody.add("input", simpleInput);
-                        JsonObject reasoning = new JsonObject();
-                        reasoning.addProperty("effort", "medium");
-                        reasoning.addProperty("summary", "detailed");
-                        simpleBody.add("reasoning", reasoning);
-                    } else {
-                        simpleBody.add("messages", simpleInput);
-                        if (model.contains("gpt") || model.contains("o1") || model.contains("deepseek-reasoner")) {
-                            simpleBody.addProperty("reasoning_effort", "medium");
-                        }
-                    }
-
-                    String simpleBodyString = gson.toJson(simpleBody);
-                    plugin.getLogger().info("[AI Request] Retrying with simplified payload: " + simpleBodyString);
-
-                    HttpRequest simpleRequest = HttpRequest.newBuilder()
-                            .uri(URI.create(url))
-                            .header("Authorization", "Bearer " + cfKey)
-                            .header("Content-Type", "application/json; charset=utf-8")
-                            .timeout(Duration.ofSeconds(plugin.getConfigManager().getApiTimeoutSeconds()))
-                            .POST(HttpRequest.BodyPublishers.ofString(simpleBodyString, StandardCharsets.UTF_8))
-                            .build();
-
-                    HttpResponse<String> simpleResp = sendWithRetry(simpleRequest);
-                    String simpleRespBody = simpleResp.body();
-                    plugin.getLogger().info("[AI Response - Retry] Code: " + simpleResp.statusCode());
-
-                    // 记录重试的原始输入和输出到调试日志文件
-                    logDebug(session, simpleBodyString + " (RETRY)", simpleRespBody);
-
-                    if (simpleResp.statusCode() != 200) {
-                        plugin.getLogger().warning("[AI Error - Retry] Response Body: " + simpleRespBody);
-                        throw new IOException("AI 调用失败(重试): " + simpleResp.statusCode() + " - " + simpleRespBody);
-                    }
-
-                    JsonObject responseJson = gson.fromJson(simpleRespBody, JsonObject.class);
-                    String textC = null;
-                    String thoughtC = null;
-
-                    // 1. 尝试解析 OpenAI 兼容格式
-                    if (responseJson.has("choices") && responseJson.get("choices").isJsonArray()) {
-                        JsonArray choices = responseJson.getAsJsonArray("choices");
-                        if (choices.size() > 0) {
-                            JsonObject choice = choices.get(0).getAsJsonObject();
-                            if (choice.has("message")) {
-                                JsonObject message = choice.getAsJsonObject("message");
-                                if (message.has("content") && !message.get("content").isJsonNull()) {
-                                    textC = message.get("content").getAsString();
-                                }
-                                if (message.has("reasoning_content") && !message.get("reasoning_content").isJsonNull()) {
-                                    thoughtC = message.get("reasoning_content").getAsString();
-                                }
-                            }
-                        }
-                    }
-
-                    // 2. 尝试解析 Cloudflare 原生 output 格式
-                    if (responseJson.has("output") && responseJson.get("output").isJsonArray()) {
-                        JsonArray outputArray = responseJson.getAsJsonArray("output");
-                        for (int i = 0; i < outputArray.size(); i++) {
-                            JsonObject item = outputArray.get(i).getAsJsonObject();
-                            String itemType = item.has("type") ? item.get("type").getAsString() : "";
-                            if ("message".equals(itemType)) {
-                                if (item.has("content") && item.get("content").isJsonArray()) {
-                                    JsonArray contents = item.getAsJsonArray("content");
-                                    for (int j = 0; j < contents.size(); j++) {
-                                        JsonObject contentObj = contents.get(j).getAsJsonObject();
-                                        String type = contentObj.has("type") ? contentObj.get("type").getAsString() : "";
-                                        if ("output_text".equals(type) && textC == null) {
-                                            textC = contentObj.get("text").isJsonNull() ? null : contentObj.get("text").getAsString();
-                                        } else if (("thought".equals(type) || "reasoning".equals(type)) && thoughtC == null) {
-                                            thoughtC = contentObj.get("text").isJsonNull() ? null : contentObj.get("text").getAsString();
-                                        }
-                                    }
-                                }
-                            } else if ("reasoning".equals(itemType) && thoughtC == null) {
-                                if (item.has("summary")) {
-                                    if (item.get("summary").isJsonArray()) {
-                                        JsonArray summaryArray = item.getAsJsonArray("summary");
-                                        StringBuilder sb = new StringBuilder();
-                                        for (int j = 0; j < summaryArray.size(); j++) {
-                                            JsonObject summaryObj = summaryArray.get(j).getAsJsonObject();
-                                            if (summaryObj.has("text") && !summaryObj.get("text").isJsonNull()) {
-                                                if (sb.length() > 0) sb.append("\n");
-                                                sb.append(summaryObj.get("text").getAsString());
-                                            }
-                                        }
-                                        if (sb.length() > 0) thoughtC = sb.toString();
-                                    } else if (item.get("summary").isJsonPrimitive()) {
-                                        thoughtC = item.get("summary").getAsString();
-                                    }
-                                }
-                                if (thoughtC == null && item.has("content") && item.get("content").isJsonArray()) {
-                                    JsonArray contents = item.getAsJsonArray("content");
-                                    StringBuilder sb = new StringBuilder();
-                                    for (int j = 0; j < contents.size(); j++) {
-                                        JsonObject contentObj = contents.get(j).getAsJsonObject();
-                                        String type = contentObj.has("type") ? contentObj.get("type").getAsString() : "";
-                                        if ("reasoning_text".equals(type) && contentObj.has("text") && !contentObj.get("text").isJsonNull()) {
-                                            if (sb.length() > 0) sb.append("\n");
-                                            sb.append(contentObj.get("text").getAsString());
-                                        }
-                                    }
-                                    if (sb.length() > 0) thoughtC = sb.toString();
-                                }
-                            }
-                        }
-                    }
-
-                    // 3. 尝试解析 Cloudflare 原生 result 格式
-                    if (responseJson.has("result")) {
-                        JsonObject result = responseJson.getAsJsonObject("result");
-                        if (textC == null) {
-                            if (result.has("response")) textC = result.get("response").isJsonNull() ? null : result.get("response").getAsString();
-                            else if (result.has("text")) textC = result.get("text").isJsonNull() ? null : result.get("text").getAsString();
-                        }
-
-                        if (thoughtC == null) {
-                            if (result.has("reasoning")) thoughtC = result.get("reasoning").isJsonNull() ? null : result.get("reasoning").getAsString();
-                            else if (result.has("thought")) thoughtC = result.get("thought").isJsonNull() ? null : result.get("thought").getAsString();
-                        }
-                    }
-
-                    if (textC != null) {
-                        return new AIResponse(textC, thoughtC);
-                    }
-                    throw new IOException("无法解析 AI 响应结果(重试): " + simpleRespBody);
+                    return retryWithSimplifiedPayload(session, model, useResponsesApi, url, cfKey);
                 }
 
                 throw new IOException("AI 调用失败: " + response.statusCode() + " - " + responseBody);
             }
 
             JsonObject responseJson = gson.fromJson(responseBody, JsonObject.class);
-            String textContent = null;
-            String thoughtContent = null;
-
-            // 1. 尝试解析 OpenAI 兼容格式 (choices 数组)
-            if (responseJson.has("choices") && responseJson.get("choices").isJsonArray()) {
-                JsonArray choices = responseJson.getAsJsonArray("choices");
-                if (choices.size() > 0) {
-                    JsonObject choice = choices.get(0).getAsJsonObject();
-                    if (choice.has("message")) {
-                        JsonObject message = choice.getAsJsonObject("message");
-                        if (message.has("content") && !message.get("content").isJsonNull()) {
-                            textContent = message.get("content").getAsString();
-                        }
-                        // 某些模型在 reasoning_content 中返回思考过程
-                        if (message.has("reasoning_content") && !message.get("reasoning_content").isJsonNull()) {
-                            thoughtContent = message.get("reasoning_content").getAsString();
-                        }
-                    }
-                }
-            }
-
-            // 2. 尝试解析 Cloudflare 原生 output 格式
-            if (responseJson.has("output") && responseJson.get("output").isJsonArray()) {
-                JsonArray outputArray = responseJson.getAsJsonArray("output");
-                for (int i = 0; i < outputArray.size(); i++) {
-                    JsonObject item = outputArray.get(i).getAsJsonObject();
-                    String itemType = item.has("type") ? item.get("type").getAsString() : "";
-                    if ("message".equals(itemType)) {
-                        if (item.has("content") && item.get("content").isJsonArray()) {
-                            JsonArray contents = item.getAsJsonArray("content");
-                            for (int j = 0; j < contents.size(); j++) {
-                                JsonObject contentObj = contents.get(j).getAsJsonObject();
-                                String type = contentObj.has("type") ? contentObj.get("type").getAsString() : "";
-                                if ("output_text".equals(type) && textContent == null) {
-                                    textContent = contentObj.get("text").getAsString();
-                                } else if (("thought".equals(type) || "reasoning".equals(type)) && thoughtContent == null) {
-                                    thoughtContent = contentObj.get("text").getAsString();
-                                }
-                            }
-                        }
-                    } else if ("reasoning".equals(itemType) && thoughtContent == null) {
-                        if (item.has("summary")) {
-                            if (item.get("summary").isJsonArray()) {
-                                JsonArray summaryArray = item.getAsJsonArray("summary");
-                                StringBuilder sb = new StringBuilder();
-                                for (int j = 0; j < summaryArray.size(); j++) {
-                                    JsonObject summaryObj = summaryArray.get(j).getAsJsonObject();
-                                    if (summaryObj.has("text") && !summaryObj.get("text").isJsonNull()) {
-                                        if (sb.length() > 0) sb.append("\n");
-                                        sb.append(summaryObj.get("text").getAsString());
-                                    }
-                                }
-                                if (sb.length() > 0) thoughtContent = sb.toString();
-                            } else if (item.get("summary").isJsonPrimitive()) {
-                                thoughtContent = item.get("summary").getAsString();
-                            }
-                        }
-                        if (thoughtContent == null && item.has("content") && item.get("content").isJsonArray()) {
-                            JsonArray contents = item.getAsJsonArray("content");
-                            StringBuilder sb = new StringBuilder();
-                            for (int j = 0; j < contents.size(); j++) {
-                                JsonObject contentObj = contents.get(j).getAsJsonObject();
-                                String type = contentObj.has("type") ? contentObj.get("type").getAsString() : "";
-                                if ("reasoning_text".equals(type) && contentObj.has("text") && !contentObj.get("text").isJsonNull()) {
-                                    if (sb.length() > 0) sb.append("\n");
-                                    sb.append(contentObj.get("text").getAsString());
-                                }
-                            }
-                            if (sb.length() > 0) thoughtContent = sb.toString();
-                        }
-                    }
-                }
-            }
-
-            // 3. 尝试解析 Cloudflare 原生 result 格式
-            if (responseJson.has("result")) {
-                JsonObject result = responseJson.getAsJsonObject("result");
-                if (textContent == null) {
-                    if (result.has("response")) textContent = result.get("response").getAsString();
-                    else if (result.has("text")) textContent = result.get("text").getAsString();
-                }
-
-                if (thoughtContent == null) {
-                    if (result.has("reasoning")) thoughtContent = result.get("reasoning").getAsString();
-                    else if (result.has("thought")) thoughtContent = result.get("thought").getAsString();
-                }
-            }
-
-            if (textContent != null) {
+            AIResponse aiResponse = responseParser.parseResponse(responseJson);
+            
+            if (aiResponse != null && aiResponse.getContent() != null) {
+                String thoughtContent = aiResponse.getThought();
                 if (thoughtContent != null) {
                     plugin.getLogger().info("[AI] Detected thought content in API field (length: " + thoughtContent.length() + ")");
-                } else if (textContent.contains("<thought>")) {
+                } else if (aiResponse.getContent().contains("<thought>")) {
                     plugin.getLogger().info("[AI] Detected thought tags inside text content");
                 }
-                return new AIResponse(textContent, thoughtContent);
+                return aiResponse;
             }
 
             throw new IOException("无法解析 AI 响应结果: " + responseBody);
@@ -719,5 +442,89 @@ public class CloudFlareAI {
             Thread.currentThread().interrupt();
             throw new IOException("AI 调用被中断: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 使用简化载荷重试 API 请求
+     * 当 API 返回 400 或 500 错误时，尝试使用最简化的请求体重试
+     */
+    private AIResponse retryWithSimplifiedPayload(DialogueSession session, String model, boolean useResponsesApi, 
+                                                    String url, String cfKey) throws IOException, InterruptedException {
+        // 构建简化的消息数组
+        JsonArray simpleInput = new JsonArray();
+        JsonObject simpleSystem = new JsonObject();
+        simpleSystem.addProperty("role", "system");
+        simpleSystem.addProperty("content", "你是一个得力的助手。");
+        simpleInput.add(simpleSystem);
+
+        // 获取最后一条用户消息
+        String lastUser = getLastUserMessage(session);
+        JsonObject simpleUser = new JsonObject();
+        simpleUser.addProperty("role", "user");
+        simpleUser.addProperty("content", lastUser);
+        simpleInput.add(simpleUser);
+
+        // 构建简化的请求体
+        JsonObject simpleBody = new JsonObject();
+        simpleBody.addProperty("model", model);
+        simpleBody.addProperty("max_tokens", 4096);
+
+        if (useResponsesApi) {
+            simpleBody.add("input", simpleInput);
+            JsonObject reasoning = new JsonObject();
+            reasoning.addProperty("effort", "medium");
+            reasoning.addProperty("summary", "detailed");
+            simpleBody.add("reasoning", reasoning);
+        } else {
+            simpleBody.add("messages", simpleInput);
+            if (model.contains("gpt") || model.contains("o1") || model.contains("deepseek-reasoner")) {
+                simpleBody.addProperty("reasoning_effort", "medium");
+            }
+        }
+
+        String simpleBodyString = gson.toJson(simpleBody);
+        plugin.getLogger().info("[AI Request] Retrying with simplified payload: " + simpleBodyString);
+
+        HttpRequest simpleRequest = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Authorization", "Bearer " + cfKey)
+                .header("Content-Type", "application/json; charset=utf-8")
+                .timeout(Duration.ofSeconds(plugin.getConfigManager().getApiTimeoutSeconds()))
+                .POST(HttpRequest.BodyPublishers.ofString(simpleBodyString, StandardCharsets.UTF_8))
+                .build();
+
+        HttpResponse<String> simpleResp = sendWithRetry(simpleRequest);
+        String simpleRespBody = simpleResp.body();
+        plugin.getLogger().info("[AI Response - Retry] Code: " + simpleResp.statusCode());
+
+        // 记录重试的原始输入和输出到调试日志文件
+        logDebug(session, simpleBodyString + " (RETRY)", simpleRespBody);
+
+        if (simpleResp.statusCode() != 200) {
+            plugin.getLogger().warning("[AI Error - Retry] Response Body: " + simpleRespBody);
+            throw new IOException("AI 调用失败(重试): " + simpleResp.statusCode() + " - " + simpleRespBody);
+        }
+
+        JsonObject responseJson = gson.fromJson(simpleRespBody, JsonObject.class);
+        AIResponse retryResponse = responseParser.parseResponse(responseJson);
+        if (retryResponse != null && retryResponse.getContent() != null) {
+            return retryResponse;
+        }
+        throw new IOException("无法解析 AI 响应结果(重试): " + simpleRespBody);
+    }
+
+    /**
+     * 获取会话中最后一条用户消息
+     */
+    private String getLastUserMessage(DialogueSession session) {
+        List<DialogueSession.Message> hist = new ArrayList<>(session.getHistory());
+        for (int i = hist.size() - 1; i >= 0; i--) {
+            DialogueSession.Message mm = hist.get(i);
+            if (mm != null && mm.getRole() != null && mm.getRole().equalsIgnoreCase("user") 
+                && mm.getContent() != null && !mm.getContent().trim().isEmpty()) {
+                return mm.getContent().trim();
+            }
+        }
+        return "Hello";
     }
 }
