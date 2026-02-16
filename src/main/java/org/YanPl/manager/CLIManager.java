@@ -473,11 +473,11 @@ public class CLIManager {
                 String randomHelp = helpPhrases[new Random().nextInt(helpPhrases.length)];
 
                 // 3. 构建并发送消息
-                // 格式：◆ [问候语]，[天蓝色玩家名]。[随机短语]
+                // 格式：◆ [问候语]，[深青色玩家名]。[随机短语]
                 TextComponent message = new TextComponent(ChatColor.WHITE + "◆ " + timeGreeting + "，");
                 
                 TextComponent playerName = new TextComponent(player.getName());
-                playerName.setColor(net.md_5.bungee.api.ChatColor.DARK_AQUA); // 天蓝色
+                playerName.setColor(net.md_5.bungee.api.ChatColor.DARK_AQUA); // 深青色
                 
                 message.addExtra(playerName);
                 message.addExtra(new TextComponent(ChatColor.WHITE + "。" + randomHelp));
