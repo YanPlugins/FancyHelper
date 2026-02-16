@@ -96,9 +96,9 @@ public class NoticeManager {
             readPlayers.add(uuid);
             playerData.set("notice.read_players", readPlayers);
             plugin.getConfigManager().savePlayerData();
-            player.sendMessage("§9FancyHelper§b§r §7> §f已将公告标记为已读");
+            player.sendMessage("§3FancyHelper§b§r §7> §f已将公告标记为已读");
         } else {
-            player.sendMessage("§9FancyHelper§b§r §7> §f该公告被你标记为已读");   
+            player.sendMessage("§3FancyHelper§b§r §7> §f该公告被你标记为已读");   
         }
     }
 
