@@ -30,6 +30,7 @@ public class CLIManager {
     private final FancyHelper plugin;
     private final CloudFlareAI ai;
     private final PromptManager promptManager;
+    private final ToolExecutor toolExecutor;
     private final Set<UUID> activeCLIPayers = new HashSet<>();
     private final Set<UUID> pendingAgreementPlayers = new HashSet<>();
     private final Set<UUID> agreedPlayers = new HashSet<>();
@@ -79,6 +80,7 @@ public class CLIManager {
         this.plugin = plugin;
         this.ai = new CloudFlareAI(plugin);
         this.promptManager = new PromptManager(plugin);
+        this.toolExecutor = new ToolExecutor(plugin, this);
         this.agreedPlayersFile = new File(plugin.getDataFolder(), "agreed_players.txt");
         this.yoloAgreedPlayersFile = new File(plugin.getDataFolder(), "yolo_agreed_players.txt");
         this.yoloModePlayersFile = new File(plugin.getDataFolder(), "yolo_mode_players.txt");
@@ -578,7 +580,7 @@ public class CLIManager {
                     String args = parts[1];
                     checkVerificationAndExecute(player, type, args);
                 } else {
-                    executeCommand(player, cmd);
+                    toolExecutor.executeCommand(player, cmd);
                 }
             }
         }
@@ -593,12 +595,12 @@ public class CLIManager {
         }
         
         if (plugin.getConfigManager().isPlayerToolEnabled(player, type)) {
-            executeFileOperation(player, type, args);
+            toolExecutor.executeFileOperation(player, type, args);
         } else {
             player.sendMessage(ChatColor.YELLOW + "首次使用 " + type + " 工具需要完成安全验证。");
             plugin.getVerificationManager().startVerification(player, type, () -> {
                 plugin.getConfigManager().setPlayerToolEnabled(player, type, true);
-                executeFileOperation(player, type, args);
+                toolExecutor.executeFileOperation(player, type, args);
             });
         }
     }
@@ -1202,98 +1204,8 @@ public class CLIManager {
         // 如果该工具之前被中断过且现在继续执行，清除记录
         interruptedToolCalls.remove(uuid);
 
-        boolean toolSuccess = true;
-
-        // 改进的解析逻辑：兼容冒号和空格分隔符，且只分割第一次出现的标识符
-        String toolName;
-        String args = "";
-
-        // 查找第一个冒号或空格的位置
-        int colonIndex = toolCall.indexOf(":");
-        int spaceIndex = toolCall.indexOf(" ");
-
-        int splitIndex = -1;
-        if (colonIndex != -1 && spaceIndex != -1) {
-            splitIndex = Math.min(colonIndex, spaceIndex);
-        } else if (colonIndex != -1) {
-            splitIndex = colonIndex;
-        } else if (spaceIndex != -1) {
-            splitIndex = spaceIndex;
-        }
-
-        if (splitIndex != -1) {
-            toolName = toolCall.substring(0, splitIndex).trim();
-            args = toolCall.substring(splitIndex + 1).trim();
-        } else {
-            toolName = toolCall.trim();
-        }
-
-        plugin.getLogger().info("[CLI] 正在为 " + player.getName() + " 执行工具: " + toolName + " (参数: " + args + ")");
-
-        // 统一转换为小写进行匹配
-        String lowerToolName = toolName.toLowerCase();
-
-        // 展示给玩家时只显示工具名（如果不是 search, run 或 over 这种有自己显示逻辑或不需要显示的工具）
-        if (!lowerToolName.equals("#search") && !lowerToolName.equals("#run") && !lowerToolName.equals("#over") && !lowerToolName.equals("#ls") && !lowerToolName.equals("#read") && !lowerToolName.equals("#diff") && !lowerToolName.equals("#exit") && !lowerToolName.equals("#todo")) {
-            player.sendMessage(ChatColor.GRAY + "〇 " + toolName);
-        } else if (lowerToolName.equals("#diff")) {
-            String[] parts = args.split("\\|", 3);
-            String path = parts.length > 0 ? parts[0].trim() : "";
-            player.sendMessage(ChatColor.GRAY + "〇 正在修改文件: " + ChatColor.WHITE + path);
-            if (parts.length >= 3) {
-                String from = parts[1];
-                String to = parts[2];
-                player.sendMessage(ChatColor.GRAY + "From " + ChatColor.WHITE + from);
-                player.sendMessage(ChatColor.GRAY + "To " + ChatColor.WHITE + to);
-            }
-        } else if (lowerToolName.equals("#exit")) {
-            player.sendMessage(ChatColor.GRAY + "〇 Exiting...");
-        }
-
-        switch (lowerToolName) {
-            case "#over":
-                isGenerating.put(uuid, false);
-                generationStates.put(uuid, GenerationStatus.COMPLETED);
-                break;
-            case "#exit":
-                exitCLI(player);
-                break;
-            case "#run":
-                if (args.isEmpty()) {
-                    player.sendMessage(ChatColor.RED + "错误: #run 工具需要提供命令参数");
-                    feedbackToAI(player, "#error: #run 工具需要提供命令参数，例如 #run: say hello");
-                    toolSuccess = false;
-                } else {
-                    handleRunTool(player, args);
-                }
-                break;
-            case "#ls":
-                handleFileTool(player, "ls", args);
-                break;
-            case "#read":
-                handleFileTool(player, "read", args);
-                break;
-            case "#diff":
-                handleFileTool(player, "diff", args);
-                break;
-            case "#getpreset":
-                handleGetTool(player, args);
-                break;
-            case "#choose":
-                handleChooseTool(player, args);
-                break;
-            case "#search":
-                handleSearchTool(player, args);
-                break;
-            case "#todo":
-                handleTodoTool(player, args);
-                break;
-            default:
-                player.sendMessage(ChatColor.RED + "未知工具: " + toolName);
-                feedbackToAI(player, "#error: 未知工具 " + toolName + "。请仅使用系统提示中定义的工具。");
-                toolSuccess = false;
-                break;
-        }
+        // 委托给 ToolExecutor 执行
+        boolean toolSuccess = toolExecutor.executeTool(player, toolCall, session);
 
         if (session != null) {
             if (toolSuccess) {
@@ -1304,710 +1216,7 @@ public class CLIManager {
         }
     }
 
-    private void handleRunTool(Player player, String command) {
-        UUID uuid = player.getUniqueId();
-        DialogueSession session = sessions.get(uuid);
-        
-        // 自动过滤掉领先的斜杠 /
-        String cleanCommand = command.startsWith("/") ? command.substring(1) : command;
-
-        // 如果是 YOLO 模式，风险命令需要确认
-        if (session != null && session.getMode() == DialogueSession.Mode.YOLO) {
-            if (isRiskyCommand(cleanCommand)) {
-                player.sendMessage(ChatColor.YELLOW + "⨀ 检测到风险命令，执行可能带来无法挽回的后果，请检查命令");
-                pendingCommands.put(uuid, cleanCommand);
-                generationStates.put(uuid, GenerationStatus.WAITING_CONFIRM);
-                sendConfirmButtons(player, cleanCommand);
-                return;
-            } else {
-                player.sendMessage(ChatColor.GOLD + "⇒ YOLO RUN " + ChatColor.WHITE + cleanCommand);
-                generationStates.put(uuid, GenerationStatus.EXECUTING_TOOL);
-                executeCommand(player, cleanCommand);
-                return;
-            }
-        }
-        
-        pendingCommands.put(uuid, cleanCommand);
-        generationStates.put(uuid, GenerationStatus.WAITING_CONFIRM);
-
-        sendConfirmButtons(player, cleanCommand);
-    }
-
-    private boolean isRiskyCommand(String cmd) {
-        java.util.List<String> risky = plugin.getConfigManager().getYoloRiskCommands();
-        if (risky == null || risky.isEmpty()) return false;
-        String lc = cmd.toLowerCase();
-        for (String r : risky) {
-            if (r == null) continue;
-            String rr = r.trim().toLowerCase();
-            if (rr.isEmpty()) continue;
-            if (lc.startsWith(rr)) return true;
-            int spaceIdx = lc.indexOf(' ');
-            String first = spaceIdx >= 0 ? lc.substring(0, spaceIdx) : lc;
-            if (first.equals(rr)) return true;
-        }
-        return false;
-    }
-
-    private void handleFileTool(Player player, String type, String args) {
-        UUID uuid = player.getUniqueId();
-        DialogueSession session = sessions.get(uuid);
-        
-        // 如果是 YOLO 模式，直接执行
-        if (session != null && session.getMode() == DialogueSession.Mode.YOLO) {
-            String actionDesc = type.equals("ls") ? "LIST" : (type.equals("read") ? "READ" : "DIFF");
-                player.sendMessage(ChatColor.GOLD + "⇒ YOLO " + actionDesc + " " + ChatColor.WHITE + args);
-            // 检查是否被冻结
-            long freezeRemaining = plugin.getVerificationManager().getPlayerFreezeRemaining(player);
-            if (freezeRemaining > 0) {
-                player.sendMessage(ChatColor.RED + "验证已冻结，请在 " + freezeRemaining + " 秒后重试。");
-                return;
-            }
-            
-            // YOLO 模式下也需要检查权限开启，但不需要手动确认
-            if (plugin.getConfigManager().isPlayerToolEnabled(player, type)) {
-                generationStates.put(uuid, GenerationStatus.EXECUTING_TOOL);
-                executeFileOperation(player, type, args);
-            } else {
-                player.sendMessage(ChatColor.YELLOW + "检测到 YOLO 模式调用 " + type + "，但该工具尚未完成首次验证。");
-                plugin.getVerificationManager().startVerification(player, type, () -> {
-                    plugin.getConfigManager().setPlayerToolEnabled(player, type, true);
-                    generationStates.put(uuid, GenerationStatus.EXECUTING_TOOL);
-                    executeFileOperation(player, type, args);
-                });
-            }
-            return;
-        }
-        
-        String pendingStr = type.toUpperCase() + ":" + args;
-        pendingCommands.put(uuid, pendingStr);
-        generationStates.put(uuid, GenerationStatus.WAITING_CONFIRM);
-
-        if ("diff".equals(type)) {
-            sendConfirmButtons(player, "");
-        } else {
-            String actionDesc = type.equals("ls") ? "请求列出目录" : "请求读取文件";
-            sendConfirmButtons(player, actionDesc + " " + ChatColor.WHITE + args);
-        }
-    }
-
-    private void sendConfirmButtons(Player player, String displayAction) {
-        TextComponent message = new TextComponent(displayAction != null && !displayAction.trim().isEmpty() ? (ChatColor.GRAY + "⇒ " + displayAction + " ") : "");
-        
-        TextComponent yBtn = new TextComponent(ChatColor.GREEN + "[ Y ]");
-        yBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli confirm"));
-        yBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text("确认执行操作")));
-
-        TextComponent spacer = new TextComponent(" / ");
-
-        TextComponent nBtn = new TextComponent(ChatColor.RED + "[ N ]");
-        nBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli cancel"));
-        nBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text("取消执行")));
-
-        message.addExtra(yBtn);
-        message.addExtra(spacer);
-        message.addExtra(nBtn);
-
-        player.spigot().sendMessage(message);
-    }
-
-    private void executeFileOperation(Player player, String type, String args) {
-        if (!plugin.isEnabled()) return;
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            try {
-                File root = Bukkit.getWorldContainer(); // 安全地获取服务器根目录
-                String result = "";
-                
-                // 处理路径参数：去除首尾空格，并去除开头的斜杠以确保相对于根目录
-                String pathArg = args.trim();
-                if (pathArg.startsWith("/") || pathArg.startsWith("\\")) {
-                    pathArg = pathArg.substring(1);
-                }
-
-                if (type.equals("ls")) {
-                    File dir = new File(root, pathArg.isEmpty() ? "." : pathArg);
-                    if (!isWithinRoot(root, dir)) {
-                        result = "错误: 路径超出服务器目录限制";
-                    } else if (!dir.exists()) {
-                        result = "错误: 目录不存在";
-                    } else if (!dir.isDirectory()) {
-                        result = "错误: 不是一个目录";
-                    } else {
-                        File[] files = dir.listFiles();
-                        if (files == null) {
-                            result = "错误: 无法列出目录内容";
-                        } else {
-                            StringBuilder sb = new StringBuilder("目录 " + (args.isEmpty() ? "." : args) + " 的内容:\n");
-                            // 排序：目录在前，文件在后，按字母顺序
-                            Arrays.sort(files, (f1, f2) -> {
-                                if (f1.isDirectory() && !f2.isDirectory()) return -1;
-                                if (!f1.isDirectory() && f2.isDirectory()) return 1;
-                                return f1.getName().compareToIgnoreCase(f2.getName());
-                            });
-                            for (File f : files) {
-                                String size = f.isDirectory() ? "" : " (" + (f.length() / 1024) + "KB)";
-                                sb.append(f.isDirectory() ? "[DIR] " : "[FILE] ").append(f.getName()).append(size).append("\n");
-                            }
-                            result = sb.toString();
-                        }
-                    }
-                } else if (type.equals("read")) {
-                    File file = new File(root, pathArg);
-                    if (!isWithinRoot(root, file)) {
-                        result = "错误: 路径超出服务器目录限制";
-                    } else if (!file.exists()) {
-                        result = "错误: 文件不存在";
-                    } else if (file.isDirectory()) {
-                        result = "错误: 这是一个目录，请使用 #ls";
-                    } else if (file.length() > 1024 * 100) { // 100KB 限制
-                        result = "错误: 文件太大 (" + (file.length() / 1024) + "KB)，无法直接读取，请分段读取或选择其他方式";
-                    } else {
-                        result = new String(java.nio.file.Files.readAllBytes(file.toPath()), java.nio.charset.StandardCharsets.UTF_8);
-                    }
-                } else if (type.equals("diff")) {
-                    String[] diffParts = pathArg.split("\\|", 3);
-                    if (diffParts.length < 3) {
-                        result = "错误: #diff 需要提供路径、查找内容和替换内容，格式：#diff: path | search | replace";
-                    } else {
-                        String path = diffParts[0].trim();
-                        String search = diffParts[1];
-                        String replace = diffParts[2];
-                        
-                        File file = new File(root, path);
-                        if (!isWithinRoot(root, file)) {
-                            result = "错误: 路径超出服务器目录限制";
-                        } else if (!file.exists()) {
-                            result = "错误: 文件不存在";
-                        } else {
-                            String content = new String(java.nio.file.Files.readAllBytes(file.toPath()), java.nio.charset.StandardCharsets.UTF_8);
-                            
-                            // 智能处理：AI 经常习惯在 | 符号前后各加一个空格。
-                            // 如果带空格的 search 找不到，但去掉前后各一个空格后能找到，则自动修正。
-                            if (!content.contains(search)) {
-                                String trimmedSearch = search;
-                                if (trimmedSearch.startsWith(" ")) trimmedSearch = trimmedSearch.substring(1);
-                                if (trimmedSearch.endsWith(" ")) trimmedSearch = trimmedSearch.substring(0, trimmedSearch.length() - 1);
-                                
-                                if (content.contains(trimmedSearch)) {
-                                    search = trimmedSearch;
-                                    // 同时也对 replace 做对称处理
-                                    if (replace.startsWith(" ")) replace = replace.substring(1);
-                                    // 注意：replace 的末尾空格不需要处理，因为 args.trim() 已经去掉了整个 tool call 的末尾空格
-                                }
-                            }
-
-                            if (!content.contains(search)) {
-                                result = "错误: 未在文件中找到指定的查找内容，请确保查找内容完全匹配（包括缩进）";
-                            } else {
-                                String newContent = content.replace(search, replace);
-                                java.nio.file.Files.write(file.toPath(), newContent.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                                result = "成功修改文件: " + path + "\n修改内容摘要：\n- 查找: " + (search.length() > 50 ? search.substring(0, 50) + "..." : search) + "\n- 替换为: " + (replace.length() > 50 ? replace.substring(0, 50) + "..." : replace);
-                            }
-                        }
-                    }
-                }
-
-                final String finalResult = result;
-                if (!plugin.isEnabled()) return;
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    player.sendMessage(ChatColor.GRAY + "⇒ 反馈已发送至 Fancy");
-                    
-                    // 提示执行结果摘要
-                    if (type.equals("ls") && !finalResult.startsWith("错误:")) {
-                        player.sendMessage(ChatColor.GRAY + "〇 已获取目录列表。");
-                    } else if (type.equals("read") && !finalResult.startsWith("错误:")) {
-                        player.sendMessage(ChatColor.GRAY + "〇 已读取文件内容 (" + (finalResult.length() / 1024.0) + "KB)。");
-                    } else if (type.equals("diff") && !finalResult.startsWith("错误:")) {
-                        player.sendMessage(ChatColor.GRAY + "〇 已成功修改文件。");
-                    }
-                    
-                    feedbackToAI(player, "#" + type + "_result: " + finalResult);
-                });
-            } catch (Exception e) {
-                plugin.getCloudErrorReport().report(e);
-                if (!plugin.isEnabled()) return;
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    feedbackToAI(player, "#" + type + "_result: 错误 - " + e.getMessage());
-                });
-            } catch (Throwable t) {
-                plugin.getCloudErrorReport().report(t);
-                if (!plugin.isEnabled()) return;
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    feedbackToAI(player, "#" + type + "_result: 严重错误 - " + t.getMessage());
-                });
-            }
-        });
-    }
-
-    private boolean isWithinRoot(File root, File file) {
-        try {
-            return file.getCanonicalPath().startsWith(root.getCanonicalPath());
-        } catch (IOException e) {
-            return false;
-        }
-    }
-
-    private void executeCommand(Player player, String command) {
-        // 开始数据包捕获
-        if (plugin.getPacketCaptureManager() != null) {
-            plugin.getPacketCaptureManager().startCapture(player);
-        }
-
-        if (!plugin.isEnabled()) return;
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            StringBuilder output = new StringBuilder();
-            
-            // 检查是否为原版命令或特定需要避开拦截器的命令
-            String cmdName = command.split(" ")[0].toLowerCase();
-            if (cmdName.startsWith("/")) cmdName = cmdName.substring(1);
-            boolean isVanilla = cmdName.startsWith("minecraft:") || 
-                               Arrays.asList("fill", "setblock", "tp", "teleport", "give", "gamemode", "spawnpoint", "weather", "time", "msg", "tell", "w", "say", "list", "execute").contains(cmdName);
-
-            boolean success = false;
-            
-            if (!isVanilla) {
-                // 对于非原版命令，尝试使用拦截器以捕获可能的 sendMessage 输出
-                try {
-                    org.bukkit.command.CommandSender interceptor = createInterceptor(player, output);
-                    success = Bukkit.dispatchCommand(interceptor, command);
-                } catch (Throwable t) {
-                    // 如果拦截器失败（如 VanillaCommandWrapper 报错），则回退到真实玩家
-                    success = player.performCommand(command);
-                }
-            } else {
-                // 对于原版命令，直接使用玩家执行，依靠 ProtocolLib 捕获输出
-                success = player.performCommand(command);
-            }
-
-            boolean finalSuccess = success;
-            
-            // 提示玩家正在等待异步反馈
-            player.sendMessage(ChatColor.GRAY + "⇒ 命令已下发，等待反馈中...");
-
-            // 延迟 1 秒（20 ticks）后再处理结果，给异步任务留出时间
-            if (!plugin.isEnabled()) return;
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                // 停止并获取数据包捕获结果
-                String packetOutput = "";
-                if (plugin.getPacketCaptureManager() != null) {
-                    packetOutput = plugin.getPacketCaptureManager().stopCapture(player);
-                }
-                
-                // 如果 ProtocolLib 捕获到了内容，优先使用它
-                // 只有在 ProtocolLib 没捕获到且 Proxy 捕获到时，才使用 Proxy 的内容，避免重复
-                String finalResult;
-                if (!packetOutput.isEmpty()) {
-                    finalResult = packetOutput;
-                } else if (output.length() > 0) {
-                    finalResult = output.toString();
-                } else if (finalSuccess) {
-                    // 如果成功但没有捕获到输出，尝试给 AI 提供更具体的上下文
-                    if (command.toLowerCase().startsWith("tp")) {
-                        finalResult = "命令执行结果未知 (你可以用choose工具问一下用户)";
-                    } else if (command.toLowerCase().startsWith("op") || command.toLowerCase().startsWith("deop")) {
-                        finalResult = "命令执行结果未知 (权限变更指令通常仅显示在控制台或被静默处理)";
-                    } else {
-                        finalResult = "命令执行结果未知 (你可以用choose工具问一下用户)";
-                    }
-                } else {
-                    // 如果失败且没有输出，通常是语法错误或原版命令拦截失败
-                    finalResult = "命令执行失败。可能原因：\n1. 命令语法错误\n2. 权限不足\n3. 该指令不支持拦截输出\n请检查语法或换一种实现方式。";
-                }
-                
-                player.sendMessage(ChatColor.GRAY + "⇒ 反馈已发送至 Fancy");
-                
-                // 将详细结果反馈给 AI
-                feedbackToAI(player, "#run_result: " + finalResult);
-            }, 20L);
-        });
-    }
-
-    /**
-     * 创建一个用于拦截命令输出的代理对象
-     */
-    private org.bukkit.command.CommandSender createInterceptor(Player player, StringBuilder output) {
-        return (org.bukkit.command.CommandSender) java.lang.reflect.Proxy.newProxyInstance(
-            plugin.getClass().getClassLoader(),
-            new Class<?>[]{org.bukkit.entity.Player.class},
-            (proxy, method, args) -> {
-                String methodName = method.getName();
-                
-                // 拦截所有 sendMessage 和相关发送消息的方法
-                if (methodName.equals("sendMessage") || methodName.equals("sendRawMessage") || methodName.equals("sendActionBar")) {
-                    if (args.length > 0 && args[0] != null) {
-                        if (args[0] instanceof String) {
-                            String msg = (String) args[0];
-                            if (output.length() > 0) output.append("\n");
-                            output.append(org.bukkit.ChatColor.stripColor(msg));
-                            if (methodName.equals("sendActionBar")) {
-                                player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR, new net.md_5.bungee.api.chat.TextComponent(msg));
-                            } else {
-                                player.sendMessage(msg);
-                            }
-                        } else if (args[0] instanceof String[]) {
-                            for (String msg : (String[]) args[0]) {
-                                if (output.length() > 0) output.append("\n");
-                                output.append(org.bukkit.ChatColor.stripColor(msg));
-                                player.sendMessage(msg);
-                            }
-                        } else if (args.length > 1 && args[0] instanceof java.util.UUID && args[1] instanceof String) {
-                            String msg = (String) args[1];
-                            if (output.length() > 0) output.append("\n");
-                            output.append(org.bukkit.ChatColor.stripColor(msg));
-                            player.sendMessage(msg);
-                        } else {
-                            String extracted = null;
-                            try {
-                                Class<?> componentClass = Class.forName("net.kyori.adventure.text.Component");
-                                Object componentObj = args[0];
-                                Object component = componentClass.isInstance(componentObj) ? componentObj : null;
-                                if (component == null) {
-                                    try {
-                                        java.lang.reflect.Method asComponent = componentObj.getClass().getMethod("asComponent");
-                                        Object maybeComponent = asComponent.invoke(componentObj);
-                                        if (componentClass.isInstance(maybeComponent)) {
-                                            component = maybeComponent;
-                                        }
-                                    } catch (Exception ignored) {
-                                    }
-                                }
-                                if (component != null) {
-                                    java.lang.reflect.Method plainTextMethod = Class.forName("net.kyori.adventure.text.serializer.plain.PlainComponentSerializer").getMethod("plain");
-                                    Object serializer = plainTextMethod.invoke(null);
-                                    java.lang.reflect.Method serializeMethod = serializer.getClass().getMethod("serialize", componentClass);
-                                    extracted = (String) serializeMethod.invoke(serializer, component);
-                                    if (extracted != null && !extracted.isEmpty()) {
-                                        if (output.length() > 0) output.append("\n");
-                                        output.append(org.bukkit.ChatColor.stripColor(extracted));
-                                        if (methodName.equals("sendActionBar")) {
-                                            try {
-                                                java.lang.reflect.Method sendActionBar = player.getClass().getMethod("sendActionBar", componentClass);
-                                                sendActionBar.invoke(player, component);
-                                            } catch (Exception ignored) {
-                                                player.sendMessage(extracted);
-                                            }
-                                        } else {
-                                            try {
-                                                java.lang.reflect.Method sendMessage = player.getClass().getMethod("sendMessage", componentClass);
-                                                sendMessage.invoke(player, component);
-                                            } catch (Exception ignored) {
-                                                player.sendMessage(extracted);
-                                            }
-                                        }
-                                    }
-                                }
-                            } catch (Exception ignored) {
-                            }
-                        }
-                    }
-                    return null;
-                }
-
-                // 拦截标题发送
-                if (methodName.equals("sendTitle") && args.length >= 2) {
-                    String title = args[0] != null ? args[0].toString() : "";
-                    String subtitle = args[1] != null ? args[1].toString() : "";
-                    if (!title.isEmpty() || !subtitle.isEmpty()) {
-                        if (output.length() > 0) output.append("\n");
-                        output.append("[Title] ").append(org.bukkit.ChatColor.stripColor(title));
-                        if (!subtitle.isEmpty()) output.append(" [Subtitle] ").append(org.bukkit.ChatColor.stripColor(subtitle));
-                        
-                        // 转发给玩家，使用更通用的 API 避开可能的版本不匹配
-                        try {
-                            player.sendTitle(title, subtitle, 
-                                args.length > 2 ? (int)args[2] : 10, 
-                                args.length > 3 ? (int)args[3] : 70, 
-                                args.length > 4 ? (int)args[4] : 20);
-                        } catch (NoSuchMethodError e) {
-                            // 兼容极旧版本或特定的 Bukkit 环境
-                            player.sendMessage(title + " " + subtitle);
-                        }
-                    }
-                    return null;
-                }
-                
-                // 拦截 spigot().sendMessage
-                if (methodName.equals("spigot")) {
-                    return new org.bukkit.command.CommandSender.Spigot() {
-                        @Override
-                        public void sendMessage(net.md_5.bungee.api.chat.BaseComponent component) {
-                            if (component == null) return;
-                            String legacyText = net.md_5.bungee.api.chat.TextComponent.toLegacyText(component);
-                            if (output.length() > 0) output.append("\n");
-                            output.append(org.bukkit.ChatColor.stripColor(legacyText));
-                            player.spigot().sendMessage(component);
-                        }
-
-                        @Override
-                        public void sendMessage(net.md_5.bungee.api.chat.BaseComponent... components) {
-                            if (components == null) return;
-                            for (net.md_5.bungee.api.chat.BaseComponent component : components) {
-                                sendMessage(component);
-                            }
-                        }
-                    };
-                }
-
-                // 其他方法（权限检查、名字等）委托给原玩家
-                try {
-                    Object result = method.invoke(player, args);
-                    // 如果方法返回 null 且返回类型是基本类型，需要返回对应的默认值
-                    if (result == null && method.getReturnType().isPrimitive()) {
-                        Class<?> returnType = method.getReturnType();
-                        if (returnType == boolean.class) return false;
-                        if (returnType == int.class) return 0;
-                        if (returnType == double.class) return 0.0;
-                        if (returnType == float.class) return 0.0f;
-                        if (returnType == long.class) return 0L;
-                        if (returnType == byte.class) return (byte) 0;
-                        if (returnType == short.class) return (short) 0;
-                        if (returnType == char.class) return '\0';
-                    }
-                    return result;
-                } catch (java.lang.reflect.InvocationTargetException e) {
-                    // 记录异常但不崩溃，尽量让命令继续执行
-                    plugin.getLogger().warning("[CLI] Method " + methodName + " threw exception: " + e.getCause().getMessage());
-                    plugin.getCloudErrorReport().report(e.getCause());
-                    throw e.getCause();
-                } catch (Exception e) {
-                    plugin.getCloudErrorReport().report(e);
-                    return null;
-                }
-            }
-        );
-    }
-
-    private void handleGetTool(Player player, String fileName) {
-        generationStates.put(player.getUniqueId(), GenerationStatus.EXECUTING_TOOL);
-        File presetFile = new File(plugin.getDataFolder(), "preset/" + fileName);
-        if (!presetFile.exists()) {
-            feedbackToAI(player, "#get_result: 文件不存在");
-            return;
-        }
-
-        try {
-            List<String> lines = java.nio.file.Files.readAllLines(presetFile.toPath());
-            String content = String.join("\n", lines);
-            feedbackToAI(player, "#get_result: " + content);
-        } catch (IOException e) {
-            feedbackToAI(player, "#get_result: 读取文件失败 - " + e.getMessage());
-        }
-    }
-
-    private void handleChooseTool(Player player, String optionsStr) {
-        String[] options = optionsStr.split(",");
-        TextComponent message = new TextComponent(ChatColor.GRAY + "⨀ [ ");
-        
-        for (int i = 0; i < options.length; i++) {
-            String opt = options[i].trim();
-            TextComponent optBtn = new TextComponent(ChatColor.AQUA + opt);
-            // 设置点击事件，点击后执行 /cli select <opt>
-            optBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli select " + opt));
-            optBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击选择: " + ChatColor.AQUA + opt)));
-            
-            message.addExtra(optBtn);
-            if (i < options.length - 1) {
-                message.addExtra(ChatColor.GRAY + " | ");
-            }
-        }
-        message.addExtra(ChatColor.GRAY + " ]");
-        
-        player.spigot().sendMessage(message);
-        // 标记玩家正在进行选择，以便拦截点击后的 RUN_COMMAND
-        pendingCommands.put(player.getUniqueId(), "CHOOSING"); 
-        generationStates.put(player.getUniqueId(), GenerationStatus.WAITING_CHOICE);
-    }
-
-    private void handleSearchTool(Player player, String query) {
-        player.sendMessage(ChatColor.GRAY + "〇 #search: " + query);
-        generationStates.put(player.getUniqueId(), GenerationStatus.EXECUTING_TOOL);
-        
-        if (!plugin.isEnabled()) return;
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            String result;
-            if (query.toLowerCase().contains("widely")) {
-                // 全网搜索模式
-                String q = query.replace("widely", "").trim();
-                // 优先使用 Metaso API（AI 搜索，效果更好）
-                if (plugin.getMetasoAPI().isAvailable()) {
-                    result = plugin.getMetasoAPI().search(q);
-                } else if (plugin.getConfigManager().isTavilyEnabled()) {
-                    result = plugin.getTavilyAPI().search(q);
-                } else {
-                    result = fetchPublicSearchResult(q);
-                }
-            } else {
-                // 先尝试 Wiki 搜索
-                result = fetchWikiResult(query);
-                // 如果 Wiki 没搜到，自动尝试全网搜索
-                if (result.equals("未找到相关 Wiki 条目。")) {
-                    player.sendMessage(ChatColor.GRAY + "〇 Wiki 无结果，正在尝试全网搜索...");
-                    // 优先使用 Metaso API（AI 搜索，效果更好）
-                    if (plugin.getMetasoAPI().isAvailable()) {
-                        result = plugin.getMetasoAPI().search(query);
-                    } else if (plugin.getConfigManager().isTavilyEnabled()) {
-                        result = plugin.getTavilyAPI().search(query);
-                    } else {
-                        result = fetchPublicSearchResult(query);
-                    }
-                }
-            }
-            
-            final String finalResult = result;
-            if (!plugin.isEnabled()) return;
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                feedbackToAI(player, "#search_result: " + finalResult);
-            });
-        });
-    }
-
-    /**
-     * 调用 Minecraft Wiki 公开 API 搜索
-     */
-    private String fetchWikiResult(String query) {
-        try {
-            // 使用 Minecraft Wiki 的 MediaWiki API
-            String url = "https://zh.minecraft.wiki/api.php?action=query&list=search&srsearch=" +
-                         java.net.URLEncoder.encode(query, "UTF-8") + "&format=json&utf8=1";
-
-            java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
-                    .connectTimeout(java.time.Duration.ofSeconds(10))
-                    .build();
-
-            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
-                    .uri(java.net.URI.create(url))
-                    .timeout(java.time.Duration.ofSeconds(10))
-                    .GET()
-                    .build();
-
-            java.net.http.HttpResponse<String> response = httpClient.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() == 200) {
-                com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(response.body()).getAsJsonObject();
-                com.google.gson.JsonArray searchResults = json.getAsJsonObject("query").getAsJsonArray("search");
-
-                if (searchResults.size() > 0) {
-                    StringBuilder sb = new StringBuilder("Minecraft Wiki 搜索结果：\n");
-                    for (int i = 0; i < Math.min(3, searchResults.size()); i++) {
-                        com.google.gson.JsonObject item = searchResults.get(i).getAsJsonObject();
-                        String title = item.get("title").getAsString();
-                        String snippet = item.get("snippet").getAsString().replaceAll("<[^>]*>", ""); // 移除 HTML 标签
-                        sb.append("- ").append(title).append(": ").append(snippet).append("\n");
-                    }
-                    return sb.toString();
-                }
-            }
-        } catch (Exception e) {
-            return "Wiki 搜索出错: " + e.getMessage();
-        }
-        return "未找到相关 Wiki 条目。";
-    }
-
-    /**
-     * 调用公开搜索接口 (UAPI Aggregate Search)
-     */
-    private String fetchPublicSearchResult(String query) {
-        try {
-            // 使用 UAPI 的聚合搜索接口
-            String url = "https://uapis.cn/api/v1/search/aggregate";
-
-            com.google.gson.JsonObject bodyJson = new com.google.gson.JsonObject();
-            // 参数名确认为 query
-            bodyJson.addProperty("query", query);
-
-            java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
-                    .connectTimeout(java.time.Duration.ofSeconds(10))
-                    .build();
-
-            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
-                    .uri(java.net.URI.create(url))
-                    .header("User-Agent", "FancyHelper/1.0")
-                    .header("Content-Type", "application/json; charset=utf-8")
-                    .timeout(java.time.Duration.ofSeconds(10))
-                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(bodyJson.toString()))
-                    .build();
-
-            java.net.http.HttpResponse<String> response = httpClient.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() == 200) {
-                String responseBody = response.body();
-                com.google.gson.JsonElement jsonElement = com.google.gson.JsonParser.parseString(responseBody);
-
-                com.google.gson.JsonArray results = null;
-                if (jsonElement.isJsonArray()) {
-                    results = jsonElement.getAsJsonArray();
-                } else if (jsonElement.isJsonObject()) {
-                    com.google.gson.JsonObject jsonObj = jsonElement.getAsJsonObject();
-                    if (jsonObj.has("data") && jsonObj.get("data").isJsonArray()) {
-                        results = jsonObj.getAsJsonArray("data");
-                    } else if (jsonObj.has("results") && jsonObj.get("results").isJsonArray()) {
-                        results = jsonObj.getAsJsonArray("results");
-                    }
-                }
-
-                if (results != null && results.size() > 0) {
-                    StringBuilder sb = new StringBuilder("全网搜索结果 (" + query + ")：\n");
-                    for (int i = 0; i < Math.min(5, results.size()); i++) {
-                        com.google.gson.JsonObject item = results.get(i).getAsJsonObject();
-
-                        String title = "无标题";
-                        if (item.has("title") && !item.get("title").isJsonNull()) {
-                            title = item.get("title").getAsString();
-                        }
-
-                        String content = "";
-                        if (item.has("content") && !item.get("content").isJsonNull()) {
-                            content = item.get("content").getAsString();
-                        } else if (item.has("snippet") && !item.get("snippet").isJsonNull()) {
-                            content = item.get("snippet").getAsString();
-                        } else if (item.has("abstract") && !item.get("abstract").isJsonNull()) {
-                            content = item.get("abstract").getAsString();
-                        }
-
-                        if (content.length() > 500) {
-                            content = content.substring(0, 500) + "...";
-                        }
-
-                        sb.append("- ").append(title).append(": ").append(content).append("\n");
-                    }
-                    return sb.toString();
-                }
-            } else {
-                plugin.getLogger().warning("UAPI 搜索失败: " + response.statusCode());
-                plugin.getLogger().warning("UAPI 错误详情: " + response.body());
-            }
-        } catch (Exception e) {
-            return "全网搜索出错: " + e.getMessage();
-        }
-        return "未找到相关全网搜索结果。";
-    }
-
-    /**
-     * 处理 待办工具调用
-     * @param player 玩家
-     * @param todoJson 待办 JSON 字符串
-     */
-    private void handleTodoTool(Player player, String todoJson) {
-        UUID uuid = player.getUniqueId();
-        generationStates.put(uuid, GenerationStatus.EXECUTING_TOOL);
-
-        String result = plugin.getTodoManager().updateTodos(uuid, todoJson);
-
-        if (result.startsWith("错误")) {
-            player.sendMessage(ChatColor.RED + "⨀ " + result);
-            feedbackToAI(player, "#todo_result: " + result);
-        } else {
-            // 显示 待办摘要
-            net.md_5.bungee.api.chat.TextComponent todoDisplay = plugin.getTodoManager().getTodoDisplayComponent(player);
-            player.spigot().sendMessage(todoDisplay);
-            
-            // 反馈给 AI - 发送完整的 待办列表信息，让 AI 了解所有任务详情
-            String todoDetails = plugin.getTodoManager().getTodoDetails(uuid);
-            feedbackToAI(player, "#todo_result: " + todoDetails);
-        }
-    }
-
-    private void feedbackToAI(Player player, String feedback) {
+    public void feedbackToAI(Player player, String feedback) {
         UUID uuid = player.getUniqueId();
         DialogueSession session = sessions.get(uuid);
         if (session == null) return;
@@ -2397,5 +1606,74 @@ public class CLIManager {
      */
     public int getActivePlayersCount() {
         return activeCLIPayers.size();
+    }
+
+    // ==================== 公共访问方法（供 ToolExecutor 使用）====================
+
+    /**
+     * 设置生成状态
+     */
+    public void setGenerating(UUID uuid, boolean generating, GenerationStatus status) {
+        isGenerating.put(uuid, generating);
+        generationStates.put(uuid, status);
+        if (status == GenerationStatus.THINKING || status == GenerationStatus.EXECUTING_TOOL) {
+            generationStartTimes.put(uuid, System.currentTimeMillis());
+        }
+    }
+
+    /**
+     * 设置待处理命令
+     */
+    public void setPendingCommand(UUID uuid, String command) {
+        pendingCommands.put(uuid, command);
+    }
+
+    /**
+     * 获取待处理命令
+     */
+    public String getPendingCommand(UUID uuid) {
+        return pendingCommands.get(uuid);
+    }
+
+    /**
+     * 移除待处理命令
+     */
+    public void removePendingCommand(UUID uuid) {
+        pendingCommands.remove(uuid);
+    }
+
+    /**
+     * 获取生成状态
+     */
+    public GenerationStatus getGenerationState(UUID uuid) {
+        return generationStates.getOrDefault(uuid, GenerationStatus.IDLE);
+    }
+
+    /**
+     * 检查是否正在生成
+     */
+    public boolean isGenerating(UUID uuid) {
+        return isGenerating.getOrDefault(uuid, false);
+    }
+
+    /**
+     * 获取对话会话
+     */
+    public DialogueSession getSession(UUID uuid) {
+        return sessions.get(uuid);
+    }
+
+    /**
+     * 记录思考时间
+     */
+    public void recordThinkingTimePublic(UUID uuid) {
+        recordThinkingTime(uuid);
+    }
+
+    /**
+     * 清除生成开始时间
+     */
+    public void clearGenerationStartTime(UUID uuid) {
+        generationStartTimes.remove(uuid);
     }
 }
