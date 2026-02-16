@@ -202,7 +202,7 @@ public class CLIManager {
                     if (session != null && (now - session.getLastActivityTime()) > timeoutMs) {
                         Player player = Bukkit.getPlayer(uuid);
                         if (player != null) {
-                            player.sendMessage("§l§bFancyHelper§b§r §7> §f由于长时间未活动，已自动退出 FancyHelper。");
+                            player.sendMessage("§3FancyHelper§b§r §7> §f由于长时间未活动，已自动退出 FancyHelper。");
                             exitCLI(player);
                         } else {
                             activeCLIPayers.remove(uuid);
@@ -389,7 +389,7 @@ public class CLIManager {
 
         // 检查 EULA 文件状态
         if (!plugin.getEulaManager().isEulaValid()) {
-            player.sendMessage("§l§bFancyHelper§b§r §7> §f错误：EULA 文件缺失或被非法改动且无法还原，请联系管理员检查权限设置。");
+            player.sendMessage("§3FancyHelper§b§r §7> §f错误：EULA 文件缺失或被非法改动且无法还原，请联系管理员检查权限设置。");
             plugin.getLogger().warning("[CLI] 由于 EULA 文件无效，拒绝了 " + player.getName() + " 的访问。");
             return;
         }
@@ -477,7 +477,7 @@ public class CLIManager {
                 TextComponent message = new TextComponent(ChatColor.WHITE + "◆ " + timeGreeting + "，");
                 
                 TextComponent playerName = new TextComponent(player.getName());
-                playerName.setColor(net.md_5.bungee.api.ChatColor.AQUA); // 天蓝色
+                playerName.setColor(net.md_5.bungee.api.ChatColor.DARK_AQUA); // 天蓝色
                 
                 message.addExtra(playerName);
                 message.addExtra(new TextComponent(ChatColor.WHITE + "。" + randomHelp));
@@ -1385,7 +1385,7 @@ public class CLIManager {
             for (int i = 0; i < codeParts.length; i++) {
                 if (i % 2 == 1) {
                     // 代码块部分，亮蓝色显示
-                    finalMessage.addExtra(ChatColor.AQUA + codeParts[i]);
+                    finalMessage.addExtra(ChatColor.DARK_AQUA + codeParts[i]);
                 } else {
                     // 普通文本部分，进一步处理 **...** 高亮
                     String text = codeParts[i];
@@ -1394,7 +1394,7 @@ public class CLIManager {
                     for (int j = 0; j < highlightParts.length; j++) {
                         if (j % 2 == 1) {
                             // 高亮部分，亮蓝色显示
-                            finalMessage.addExtra(ChatColor.AQUA + highlightParts[j]);
+                            finalMessage.addExtra(ChatColor.DARK_AQUA + highlightParts[j]);
                         } else {
                             // 普通部分，白色显示
                             finalMessage.addExtra(ChatColor.WHITE + highlightParts[j]);
@@ -1412,7 +1412,7 @@ public class CLIManager {
     public void handleThought(Player player, String[] args) {
         DialogueSession session = sessions.get(player.getUniqueId());
         if (session == null) {
-            player.sendMessage("§l§bFancyHelper§b§r §7> §f当前没有活动的对话。");
+            player.sendMessage("§3FancyHelper§b§r §7> §f当前没有活动的对话。");
             return;
         }
 
@@ -1458,7 +1458,7 @@ public class CLIManager {
         }
 
         if (thought == null) {
-            player.sendMessage("§l§bFancyHelper§b§r §7> §f找不到对应的思考过程。");
+            player.sendMessage("§3FancyHelper§b§r §7> §f找不到对应的思考过程。");
             return;
         }
 

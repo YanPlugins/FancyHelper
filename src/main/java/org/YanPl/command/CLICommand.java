@@ -52,7 +52,7 @@ public class CLICommand implements CommandExecutor, TabCompleter {
         switch (subCommand) {
             case "reload":
                 if (!sender.hasPermission("fancyhelper.reload")) {
-                    sender.sendMessage("§l§bFancyHelper§b§r §7> §f你没有权限执行重载。");
+                    sender.sendMessage("§3FancyHelper§b§r §7> §f你没有权限执行重载。");
                     return true;
                 }
                 handleReload(sender, args);
@@ -63,15 +63,15 @@ public class CLICommand implements CommandExecutor, TabCompleter {
             case "update":
             case "checkupdate":
                 if (!(sender.isOp() || sender.hasPermission("fancyhelper.reload"))) {
-                    sender.sendMessage("§l§bFancyHelper§b§r §7> §f你没有权限检查更新。");
+                    sender.sendMessage("§3FancyHelper§b§r §7> §f你没有权限检查更新。");
                     return true;
                 }
-                sender.sendMessage("§l§bFancyHelper§b§r §7> §f正在检查更新...");
+                sender.sendMessage("§3FancyHelper§b§r §7> §f正在检查更新...");
                 plugin.getUpdateManager().checkForUpdates(sender instanceof Player ? (Player) sender : null);
                 break;
             case "notice":
                 if (!sender.hasPermission("fancyhelper.notice")) {
-                    sender.sendMessage("§l§bFancyHelper§b§r §7> §f你没有权限查看公告。");
+                    sender.sendMessage("§3FancyHelper§b§r §7> §f你没有权限查看公告。");
                     return true;
                 }
                 if (args.length > 1 && args[1].equalsIgnoreCase("read")) {
@@ -87,7 +87,7 @@ public class CLICommand implements CommandExecutor, TabCompleter {
             case "upgrade":
             case "download":
                 if (!sender.hasPermission("fancyhelper.reload")) {
-                    sender.sendMessage("§l§bFancyHelper§b§r §7> §f你没有权限执行更新。");
+                    sender.sendMessage("§3FancyHelper§b§r §7> §f你没有权限执行更新。");
                     return true;
                 }
                 plugin.getUpdateManager().downloadAndInstall(sender instanceof Player ? (Player) sender : null, true);
@@ -118,13 +118,13 @@ public class CLICommand implements CommandExecutor, TabCompleter {
                 return true;
             case "error":
                 if (!sender.isOp()) {
-                    sender.sendMessage("§l§bFancyHelper§b§r §7> §f该测试命令仅限管理员使用。");
+                    sender.sendMessage("§3FancyHelper§b§r §7> §f该测试命令仅限管理员使用。");
                     return true;
                 }
                 if (sender instanceof Player) {
                     handleTestError((Player) sender);
                 } else {
-                    sender.sendMessage("§l§bFancyHelper§b§r §7> §f该测试命令仅限玩家使用。");
+                    sender.sendMessage("§3FancyHelper§b§r §7> §f该测试命令仅限玩家使用。");
                 }
                 return true;
             default:
@@ -136,7 +136,7 @@ public class CLICommand implements CommandExecutor, TabCompleter {
     }
 
     private void sendHelp(CommandSender sender) {
-        sender.sendMessage("§l§bFancyHelper§b§r §7> §f可用子命令:");
+        sender.sendMessage("§3FancyHelper§b§r §7> §f可用子命令:");
         sender.sendMessage(" §7- §b/cli §f: 切换进入/退出 CLI 模式");
         sender.sendMessage(" §7- §b/cli reload §f: 重新加载配置与工作区");
         sender.sendMessage(" §7- §b/cli status §f: 查看插件运行状态");
@@ -234,25 +234,25 @@ public class CLICommand implements CommandExecutor, TabCompleter {
             plugin.getConfigManager().loadPlayerData();
             plugin.getWorkspaceIndexer().indexAll();
             plugin.getEulaManager().reload();
-            sender.sendMessage("§l§bFancyHelper§b§r §7> §f配置、玩家数据、工作区与 EULA 已重新加载。");
+            sender.sendMessage("§3FancyHelper§b§r §7> §f配置、玩家数据、工作区与 EULA 已重新加载。");
         } else if (args.length == 2) {
             String target = args[1].toLowerCase();
             if (target.equals("workspace")) {
                 plugin.getWorkspaceIndexer().indexAll();
-                sender.sendMessage("§l§bFancyHelper§b§r §7> §f工作区索引已重新加载。");
+                sender.sendMessage("§3FancyHelper§b§r §7> §f工作区索引已重新加载。");
             } else if (target.equals("config")) {
                 plugin.getConfigManager().loadConfig();
-                sender.sendMessage("§l§bFancyHelper§b§r §7> §f配置文件已重新加载。");
+                sender.sendMessage("§3FancyHelper§b§r §7> §f配置文件已重新加载。");
             } else if (target.equals("playerdata")) {
                 plugin.getConfigManager().loadPlayerData();
-                sender.sendMessage("§l§bFancyHelper§b§r §7> §f玩家数据已重新加载。");
+                sender.sendMessage("§3FancyHelper§b§r §7> §f玩家数据已重新加载。");
             } else if (target.equals("eula")) {
                 plugin.getEulaManager().reload();
-                sender.sendMessage("§l§bFancyHelper§b§r §7> §fEULA 文件已重新加载。");
+                sender.sendMessage("§3FancyHelper§b§r §7> §fEULA 文件已重新加载。");
             } else if (target.equals("deeply") || target.equals("deep")) {
                 handleDeepReload(sender);
             } else {
-                sender.sendMessage("§l§bFancyHelper§b§r §7> §f用法: /fancy reload [workspace|config|playerdata|eula|deeply]");
+                sender.sendMessage("§3FancyHelper§b§r §7> §f用法: /fancy reload [workspace|config|playerdata|eula|deeply]");
             }
         }
     }
@@ -295,9 +295,9 @@ public class CLICommand implements CommandExecutor, TabCompleter {
             }
             pluginManager.enablePlugin(reloadPlugin);
 
-            sender.sendMessage(ChatColor.GREEN + "§l§bFancyHelper§b§r §7> §f正在深度重载，可能需要20s左右的时间等待响应");
+            sender.sendMessage(ChatColor.GREEN + "§3FancyHelper§b§r §7> §f正在深度重载，可能需要20s左右的时间等待响应");
         } catch (Exception e) {
-            sender.sendMessage(ChatColor.RED + "§l§bFancyHelper§b§r §7> §f启动重载服务时发生错误: " + e.getMessage());
+            sender.sendMessage(ChatColor.RED + "§3FancyHelper§b§r §7> §f启动重载服务时发生错误: " + e.getMessage());
             e.printStackTrace();
             plugin.getCloudErrorReport().report(e);
         }
