@@ -62,8 +62,20 @@ public class PacketCaptureManager {
                         String message = extractMessage(event.getPacket());
                         if (message != null && !message.isEmpty()) {
                             // 过滤掉插件自身的提示消息，避免循环反馈或干扰 AI
-                            String stripped = ChatColor.stripColor(message);
-                            if (stripped.startsWith("⇒") || stripped.startsWith("◇") || stripped.startsWith("◆") || stripped.contains("FancyHelper")) {
+                            String stripped = ChatColor.stripColor(message).trim();
+                            if (stripped.isEmpty() || 
+                                stripped.startsWith("⇒") || 
+                                stripped.startsWith("◇") || 
+                                stripped.startsWith("◆") || 
+                                stripped.contains("FancyHelper")) {
+                                return;
+                            }
+
+                            // 关键修复：过滤掉明显的玩家聊天消息，防止多玩家环境下上下文混淆
+                            // 匹配标准聊天格式 <PlayerName> Message 或 [World] <PlayerName> Message
+                            if (stripped.matches("^<[^>]+>.*") || 
+                                stripped.matches("^\\[.*\\]\\s*<[^>]+>.*") ||
+                                stripped.matches("^\\* [^ ]+ .*")) { // /me 命令格式
                                 return;
                             }
 

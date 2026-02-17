@@ -12,7 +12,7 @@ import org.YanPl.util.ColorUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
-
+import org.bukkit.scheduler.BukkitRunnable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -21,8 +21,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-
-import org.bukkit.scheduler.BukkitRunnable;
 
 /**
  * CLI 模式管理器，负责管理玩家的 CLI 状态和对话流
