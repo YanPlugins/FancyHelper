@@ -8,6 +8,7 @@ import org.YanPl.FancyHelper;
 import org.YanPl.api.CloudFlareAI;
 import org.YanPl.model.AIResponse;
 import org.YanPl.model.DialogueSession;
+import org.YanPl.util.ColorUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
@@ -202,7 +203,7 @@ public class CLIManager {
                     if (session != null && (now - session.getLastActivityTime()) > timeoutMs) {
                         Player player = Bukkit.getPlayer(uuid);
                         if (player != null) {
-                            player.sendMessage("§3FancyHelper§b§r §7> §f由于长时间未活动，已自动退出 FancyHelper。");
+                            player.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f由于长时间未活动，已自动退出 FancyHelper。"));
                             exitCLI(player);
                         } else {
                             activeCLIPayers.remove(uuid);
@@ -389,7 +390,7 @@ public class CLIManager {
 
         // 检查 EULA 文件状态
         if (!plugin.getEulaManager().isEulaValid()) {
-            player.sendMessage("§3FancyHelper§b§r §7> §f错误：EULA 文件缺失或被非法改动且无法还原，请联系管理员检查权限设置。");
+            player.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f错误：EULA 文件缺失或被非法改动且无法还原，请联系管理员检查权限设置。"));
             plugin.getLogger().warning("[CLI] 由于 EULA 文件无效，拒绝了 " + player.getName() + " 的访问。");
             return;
         }
@@ -473,11 +474,11 @@ public class CLIManager {
                 String randomHelp = helpPhrases[new Random().nextInt(helpPhrases.length)];
 
                 // 3. 构建并发送消息
-                // 格式：◆ [问候语]，[深青色玩家名]。[随机短语]
+                // 格式：◆ [问候语]，[自定义亮蓝色玩家名]。[随机短语]
                 TextComponent message = new TextComponent(ChatColor.WHITE + "◆ " + timeGreeting + "，");
                 
                 TextComponent playerName = new TextComponent(player.getName());
-                playerName.setColor(net.md_5.bungee.api.ChatColor.DARK_AQUA); // 深青色
+                playerName.setColor(net.md_5.bungee.api.ChatColor.of("#30AEE5")); // 自定义亮蓝色
                 
                 message.addExtra(playerName);
                 message.addExtra(new TextComponent(ChatColor.WHITE + "。" + randomHelp));
@@ -1378,6 +1379,9 @@ public class CLIManager {
 
         // 处理正文内容
         if (content != null && !content.trim().isEmpty()) {
+            // 先处理自定义颜色代码 §x 和 §z
+            content = ColorUtil.translateCustomColors(content);
+            
             // 处理代码块 ```...```
             String[] codeParts = content.split("```");
             TextComponent finalMessage = new TextComponent(ChatColor.WHITE + "◆ ");
@@ -1393,8 +1397,8 @@ public class CLIManager {
                     
                     for (int j = 0; j < highlightParts.length; j++) {
                         if (j % 2 == 1) {
-                            // 高亮部分，亮蓝色显示
-                            finalMessage.addExtra(ChatColor.DARK_AQUA + highlightParts[j]);
+                            // 高亮部分，使用自定义亮蓝色 #30AEE5
+                            finalMessage.addExtra(net.md_5.bungee.api.ChatColor.of("#30AEE5") + highlightParts[j]);
                         } else {
                             // 普通部分，白色显示
                             finalMessage.addExtra(ChatColor.WHITE + highlightParts[j]);
@@ -1412,7 +1416,7 @@ public class CLIManager {
     public void handleThought(Player player, String[] args) {
         DialogueSession session = sessions.get(player.getUniqueId());
         if (session == null) {
-            player.sendMessage("§3FancyHelper§b§r §7> §f当前没有活动的对话。");
+            player.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f当前没有活动的对话。"));
             return;
         }
 
@@ -1458,7 +1462,7 @@ public class CLIManager {
         }
 
         if (thought == null) {
-            player.sendMessage("§3FancyHelper§b§r §7> §f找不到对应的思考过程。");
+            player.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f找不到对应的思考过程。"));
             return;
         }
 

@@ -7,6 +7,7 @@ import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.hover.content.Text;
 import org.YanPl.FancyHelper;
+import org.YanPl.util.ColorUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
@@ -96,9 +97,9 @@ public class NoticeManager {
             readPlayers.add(uuid);
             playerData.set("notice.read_players", readPlayers);
             plugin.getConfigManager().savePlayerData();
-            player.sendMessage("§3FancyHelper§b§r §7> §f已将公告标记为已读");
+            player.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f已将公告标记为已读"));
         } else {
-            player.sendMessage("§3FancyHelper§b§r §7> §f该公告被你标记为已读");   
+            player.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f该公告被你标记为已读"));   
         }
     }
 
