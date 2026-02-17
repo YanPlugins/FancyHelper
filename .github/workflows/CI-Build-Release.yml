@@ -254,8 +254,7 @@ jobs:
     needs: [ build ]
     if: needs.build.outputs.IS_RELEASE == 'true'
     outputs:
-      ai_overview: ${{ steps.ai_result.outputs.OVERVIEW }}
-      github_notes: ${{ steps.github_notes.outputs.NOTES }}
+      release_body: ${{ steps.compose_body.outputs.BODY }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -288,76 +287,109 @@ jobs:
         id: prs
         run: |
           if [[ -n "${{ steps.last_tag.outputs.LAST_TAG }}" ]]; then
-            # 获取上次 tag 到当前 HEAD 之间的 PR
             PRS=$(gh api \
               "repos/${{ github.repository }}/pulls" \
-              --jq '.[] | select(.merged_at != null and .merged_at > "'$(git log -1 --format=%cI ${{ steps.last_tag.outputs.LAST_TAG }})'") | "## \u2728 \(.title)\n\(.body)\n---\n"' 2>/dev/null || echo "")
+              --jq '.[] | select(.merged_at != null and .merged_at > "'$(git log -1 --format=%cI ${{ steps.last_tag.outputs.LAST_TAG }})'") | "- \(.title)"' 2>/dev/null || echo "")
           else
-            # 没有上次tag，获取最近的 PR
             PRS=$(gh api \
               "repos/${{ github.repository }}/pulls?state=closed&sort=updated&direction=desc" \
-              --jq '.[] | select(.merged == true) | "## \u2728 \(.title)\n\(.body)\n---\n"' -10 2>/dev/null || echo "")
+              --jq '.[] | select(.merged == true) | "- \(.title)"' -10 2>/dev/null || echo "")
           fi
           echo "PRS<<EOF" >> $GITHUB_OUTPUT
           echo "$PRS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           echo "PRs: $PRS"
 
-      # 获取仓库信息
-      - name: 获取仓库信息
-        id: repo_info
+      # 获取自上次 tag 以来的 commit 变化
+      - name: 获取 Commit 变化
+        id: commits
         run: |
-          echo "REPO_NAME=${{ github.repository }}" >> $GITHUB_OUTPUT
-          echo "REPO_OWNER=${{ github.repository_owner }}" >> $GITHUB_OUTPUT
+          if [[ -n "${{ steps.last_tag.outputs.LAST_TAG }}" ]]; then
+            COMMITS=$(git log ${{ steps.last_tag.outputs.LAST_TAG }}..HEAD --pretty=format:"- %s" --no-merges 2>/dev/null || echo "")
+          else
+            COMMITS=$(git log -20 --pretty=format:"- %s" --no-merges 2>/dev/null || echo "")
+          fi
+          echo "COMMITS<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "Commits: $COMMITS"
 
       # 调用 CloudFlare AI 生成 Overview
       - name: 调用 AI 生成发行注记 Overview
         id: ai_result
         run: |
-          # 获取 account-id
           ACCOUNT_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_KEY }}" \
             "https://api.cloudflare.com/client/v4/accounts" | jq -r '.result[0].id')
           
           if [[ -z "$ACCOUNT_ID" || "$ACCOUNT_ID" == "null" ]]; then
             echo "无法获取 CloudFlare Account ID，使用默认Overview"
-            echo "OVERVIEW=## Overview\n\n本次更新包含多项功能改进和问题修复。" >> $GITHUB_OUTPUT
+            echo "OVERVIEW=## Overview\n* 本次更新包含多项功能改进和问题修复" >> $GITHUB_OUTPUT
             exit 0
           fi
           
-          # 构建 prompt
           VERSION="${{ steps.version.outputs.VERSION }}"
           PRS="${{ steps.prs.outputs.PRS }}"
+          COMMITS="${{ steps.commits.outputs.COMMITS }}"
           
-          PROMPT="你是一个专业的版本发布助手。请根据以下 Pull Request 信息，为 FancyHelper Minecraft 插件生成一段中文的发行注记 Overview（简洁摘要）。\n\n版本号: v$VERSION\n\nPR 列表:\n$PRS\n\n要求：\n1. 用中文撰写\n2. 简洁明了，控制在 100-200 字\n3. 突出主要功能更新、bug修复和重要改动\n4. 使用 emoji 增加可读性\n5. 直接输出内容，不要有开场白\n6. 使用 Markdown 格式，以 ## Overview 开头\n\n请生成发行注记 Overview："
+          # 构建 prompt 并写入文件
+          echo "你是一个专业的版本发布助手。请根据以下 Pull Request 和 Commit 信息，为 FancyHelper Minecraft 插件生成中文的发行注记 Overview。" > /tmp/prompt.txt
+          echo "" >> /tmp/prompt.txt
+          echo "版本号: v$VERSION" >> /tmp/prompt.txt
+          echo "" >> /tmp/prompt.txt
+          echo "PR 列表:" >> /tmp/prompt.txt
+          echo "$PRS" >> /tmp/prompt.txt
+          echo "" >> /tmp/prompt.txt
+          echo "Commit 列表:" >> /tmp/prompt.txt
+          echo "$COMMITS" >> /tmp/prompt.txt
+          echo "" >> /tmp/prompt.txt
+          echo "要求：" >> /tmp/prompt.txt
+          echo "1. 用中文撰写" >> /tmp/prompt.txt
+          echo "2. 必须使用以下格式（严格遵守）：" >> /tmp/prompt.txt
+          echo "   ## Overview" >> /tmp/prompt.txt
+          echo "   * 第一条变更说明" >> /tmp/prompt.txt
+          echo "   * 第二条变更说明" >> /tmp/prompt.txt
+          echo "   * 第三条变更说明" >> /tmp/prompt.txt
+          echo "3. 每条变更必须以 \"* \" 开头（星号+空格），不要使用其他符号" >> /tmp/prompt.txt
+          echo "4. 简洁明了，每条控制在 10-30 字" >> /tmp/prompt.txt
+          echo "5. 突出主要功能更新、bug修复和重要改动" >> /tmp/prompt.txt
+          echo "6. 不要添加 emoji" >> /tmp/prompt.txt
+          echo "7. 直接输出内容，不要有开场白" >> /tmp/prompt.txt
+          echo "8. 总条目控制在 3-6 条" >> /tmp/prompt.txt
+          echo "" >> /tmp/prompt.txt
+          echo "请生成发行注记 Overview：" >> /tmp/prompt.txt
           
-          # 调用 CloudFlare AI API
+          PROMPT=$(cat /tmp/prompt.txt | jq -Rs '.')
+          
           RESPONSE=$(curl -s -X POST \
             "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/ai/v1/chat/completions" \
             -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d "{\
-              \"model\": \"@cf/openai/gpt-oss-120b\",\n\
-              \"messages\": [\n                {\"role\": \"system\", \"content\": \"你是一个专业的版本发布助手，擅长撰写简洁明了的中文发行注记。\"},\n                {\"role\": \"user\", \"content\": \"$PROMPT\"}\n              ],\n              \"max_tokens\": 500\n            }")
+            -d "{
+              \"model\": \"@cf/openai/gpt-oss-120b\",
+              \"messages\": [
+                {\"role\": \"system\", \"content\": \"你是一个专业的版本发布助手，擅长撰写简洁明了的中文发行注记。输出格式必须严格遵守用户要求。\"},
+                {\"role\": \"user\", \"content\": $PROMPT}
+              ],
+              \"max_tokens\": 500
+            }")
           
-          # 解析 AI 响应
           OVERVIEW=$(echo "$RESPONSE" | jq -r '.result.response // .result.message.content // ""' 2>/dev/null)
           
           if [[ -z "$OVERVIEW" || "$OVERVIEW" == "null" ]]; then
             echo "AI 响应为空，使用默认Overview"
-            echo "OVERVIEW=## Overview\n\n本次更新包含多项功能改进和问题修复。" >> $GITHUB_OUTPUT
+            echo "OVERVIEW=## Overview\n* 本次更新包含多项功能改进和问题修复" >> $GITHUB_OUTPUT
           else
-            # 转义 JSON 字符串中的特殊字符
-            OVERVIEW_ESCAPED=$(echo "$OVERVIEW" | jq -Rs '.')
+            OVERVIEW_FORMATTED=$(echo "$OVERVIEW" | sed 's/\\n/\n/g' | sed '/^$/d')
+            OVERVIEW_ESCAPED=$(echo "$OVERVIEW_FORMATTED" | jq -Rs '.')
             echo "OVERVIEW=$OVERVIEW_ESCAPED" >> $GITHUB_OUTPUT
             echo "AI Overview 生成成功"
-            echo "$OVERVIEW"
+            echo "$OVERVIEW_FORMATTED"
           fi
 
       # 获取 GitHub 自动生成的 Release Notes
       - name: 获取 GitHub Release Notes
         id: github_notes
         run: |
-          # 使用 GitHub API 生成 release notes
           NOTES=$(gh api \
             "repos/${{ github.repository }}/releases/generate-notes" \
             -f tag_name="v${{ steps.version.outputs.VERSION }}" \
@@ -365,13 +397,67 @@ jobs:
             --jq '.body' 2>/dev/null || echo "")
           
           if [[ -z "$NOTES" ]]; then
-            NOTES="暂无详细发行说明"
+            echo "WHATS_CHANGED=" >> $GITHUB_OUTPUT
+            echo "FULL_CHANGELOG=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # 提取 What's Changed 部分
+          WHATS_CHANGED=$(echo "$NOTES" | sed -n "/## What's Changed/,/\*\*Full Changelog\*\*/p" | sed '/\*\*Full Changelog\*\*/d')
+          
+          # 提取 Full Changelog 链接
+          FULL_CHANGELOG=$(echo "$NOTES" | grep -o '\*\*Full Changelog\*\*.*' || echo "")
+          
+          WHATS_CHANGED_ESCAPED=$(echo "$WHATS_CHANGED" | jq -Rs '.')
+          FULL_CHANGELOG_ESCAPED=$(echo "$FULL_CHANGELOG" | jq -Rs '.')
+          
+          echo "WHATS_CHANGED=$WHATS_CHANGED_ESCAPED" >> $GITHUB_OUTPUT
+          echo "FULL_CHANGELOG=$FULL_CHANGELOG_ESCAPED" >> $GITHUB_OUTPUT
+          echo "GitHub Release Notes 获取成功"
+          echo "What's Changed: $WHATS_CHANGED"
+          echo "Full Changelog: $FULL_CHANGELOG"
+
+      # 组合最终的 Release Body
+      - name: 组合 Release Body
+        id: compose_body
+        run: |
+          OVERVIEW="${{ steps.ai_result.outputs.OVERVIEW }}"
+          WHATS_CHANGED="${{ steps.github_notes.outputs.WHATS_CHANGED }}"
+          FULL_CHANGELOG="${{ steps.github_notes.outputs.FULL_CHANGELOG }}"
+          
+          # 创建 body 文件
+          BODY_FILE="/tmp/release_body.md"
+          echo "" > "$BODY_FILE"
+          
+          # 添加 Overview
+          if [[ -n "$OVERVIEW" && "$OVERVIEW" != "null" ]]; then
+            echo "$OVERVIEW" >> "$BODY_FILE"
+          fi
+          
+          # 添加 What's Changed
+          if [[ -n "$WHATS_CHANGED" && "$WHATS_CHANGED" != "null" ]]; then
+            echo "" >> "$BODY_FILE"
+            echo "" >> "$BODY_FILE"
+            echo "$WHATS_CHANGED" >> "$BODY_FILE"
+          fi
+          
+          # 添加 Full Changelog
+          if [[ -n "$FULL_CHANGELOG" && "$FULL_CHANGELOG" != "null" ]]; then
+            echo "" >> "$BODY_FILE"
+            echo "" >> "$BODY_FILE"
+            echo "$FULL_CHANGELOG" >> "$BODY_FILE"
+          fi
+          
+          # 如果都为空，使用默认内容
+          if [[ ! -s "$BODY_FILE" ]]; then
+            echo "本次更新包含多项功能改进和问题修复。" >> "$BODY_FILE"
           fi
           
           # 转义并输出
-          NOTES_ESCAPED=$(echo "$NOTES" | jq -Rs '.')
-          echo "NOTES=$NOTES_ESCAPED" >> $GITHUB_OUTPUT
-          echo "GitHub Release Notes 获取成功"
+          BODY_ESCAPED=$(cat "$BODY_FILE" | jq -Rs '.')
+          echo "BODY=$BODY_ESCAPED" >> $GITHUB_OUTPUT
+          echo "Release Body 已生成"
+          cat "$BODY_FILE"
 
   # ==================== 发布正式 Release ====================
   release:
@@ -382,7 +468,6 @@ jobs:
     permissions:
       contents: write
     steps:
-      # 判断artifact名称（简化逻辑：直接查找匹配的最新artifact）
       - name: 下载构建产物
         uses: actions/download-artifact@v4
         with:
@@ -398,5 +483,5 @@ jobs:
           tag_name: v${{ needs.build.outputs.RELEASE_VERSION }}
           name: Release v${{ needs.build.outputs.RELEASE_VERSION }}
           target_commitish: ${{ github.sha }}
-          body: ${{ needs.generate-overview.outputs.ai_overview }}${{ needs.generate-overview.outputs.github_notes }}
+          body: ${{ needs.generate-overview.outputs.release_body }}
           make_latest: true
