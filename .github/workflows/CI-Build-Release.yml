@@ -283,20 +283,25 @@ jobs:
           echo "LAST_TAG=$LAST_TAG" >> $GITHUB_OUTPUT
           echo "上次 Release Tag: $LAST_TAG"
 
-      # 获取自上次 tag 以来的 commits
-      - name: 获取 Commits 变化
-        id: commits
+      # 获取自上次 tag 以来的 PR 变化
+      - name: 获取 PR 变化
+        id: prs
         run: |
           if [[ -n "${{ steps.last_tag.outputs.LAST_TAG }}" ]]; then
-            COMMITS=$(git log ${{ steps.last_tag.outputs.LAST_TAG }}..HEAD --pretty=format:"%s (%h)" 2>/dev/null || echo "无")
+            # 获取上次 tag 到当前 HEAD 之间的 PR
+            PRS=$(gh api \
+              "repos/${{ github.repository }}/pulls" \
+              --jq '.[] | select(.merged_at != null and .merged_at > "'$(git log -1 --format=%cI ${{ steps.last_tag.outputs.LAST_TAG }})'") | "## \u2728 \(.title)\n\(.body)\n---\n"' 2>/dev/null || echo "")
           else
-            # 没有上次tag，获取所有commits
-            COMMITS=$(git log --pretty=format:"%s (%h)" -20 2>/dev/null || echo "无")
+            # 没有上次tag，获取最近的 PR
+            PRS=$(gh api \
+              "repos/${{ github.repository }}/pulls?state=closed&sort=updated&direction=desc" \
+              --jq '.[] | select(.merged == true) | "## \u2728 \(.title)\n\(.body)\n---\n"' -10 2>/dev/null || echo "")
           fi
-          echo "COMMITS<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "PRS<<EOF" >> $GITHUB_OUTPUT
+          echo "$PRS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          echo "Commits: $COMMITS"
+          echo "PRs: $PRS"
 
       # 获取仓库信息
       - name: 获取仓库信息
@@ -315,15 +320,15 @@ jobs:
           
           if [[ -z "$ACCOUNT_ID" || "$ACCOUNT_ID" == "null" ]]; then
             echo "无法获取 CloudFlare Account ID，使用默认Overview"
-            echo "OVERVIEW=## 🚀 版本概述\n\n本次更新包含多项功能改进和问题修复。" >> $GITHUB_OUTPUT
+            echo "OVERVIEW=## Overview\n\n本次更新包含多项功能改进和问题修复。" >> $GITHUB_OUTPUT
             exit 0
           fi
           
           # 构建 prompt
           VERSION="${{ steps.version.outputs.VERSION }}"
-          COMMITS="${{ steps.commits.outputs.COMMITS }}"
+          PRS="${{ steps.prs.outputs.PRS }}"
           
-          PROMPT="你是一个专业的版本发布助手。请根据以下 Git commits 信息，为 FancyHelper Minecraft 插件生成一段中文的发行注记 Overview（简洁摘要）。\n\n版本号: v$VERSION\n\nCommits 列表:\n$COMMITS\n\n要求：\n1. 用中文撰写\n2. 简洁明了，控制在 100-200 字\n3. 突出主要功能更新、bug修复和重要改动\n4. 使用 emoji 增加可读性\n5. 直接输出内容，不要有开场白\n6. 使用 Markdown 格式，以 ## 🚀 版本概述 开头\n\n请生成发行注记 Overview："
+          PROMPT="你是一个专业的版本发布助手。请根据以下 Pull Request 信息，为 FancyHelper Minecraft 插件生成一段中文的发行注记 Overview（简洁摘要）。\n\n版本号: v$VERSION\n\nPR 列表:\n$PRS\n\n要求：\n1. 用中文撰写\n2. 简洁明了，控制在 100-200 字\n3. 突出主要功能更新、bug修复和重要改动\n4. 使用 emoji 增加可读性\n5. 直接输出内容，不要有开场白\n6. 使用 Markdown 格式，以 ## Overview 开头\n\n请生成发行注记 Overview："
           
           # 调用 CloudFlare AI API
           RESPONSE=$(curl -s -X POST \
@@ -339,7 +344,7 @@ jobs:
           
           if [[ -z "$OVERVIEW" || "$OVERVIEW" == "null" ]]; then
             echo "AI 响应为空，使用默认Overview"
-            echo "OVERVIEW=## 🚀 版本概述\n\n本次更新包含多项功能改进和问题修复。" >> $GITHUB_OUTPUT
+            echo "OVERVIEW=## Overview\n\n本次更新包含多项功能改进和问题修复。" >> $GITHUB_OUTPUT
           else
             # 转义 JSON 字符串中的特殊字符
             OVERVIEW_ESCAPED=$(echo "$OVERVIEW" | jq -Rs '.')
