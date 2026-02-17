@@ -453,30 +453,35 @@ jobs:
       # 获取 GitHub 自动生成的 Release Notes
       - name: 获取 GitHub Release Notes
         id: github_notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          NOTES=$(gh api \
-            "repos/${{ github.repository }}/releases/generate-notes" \
-            -f tag_name="v${{ steps.version.outputs.VERSION }}" \
-            -f target_commitish="${{ github.sha }}" \
-            --jq '.body' 2>/dev/null || echo "")
+          echo "正在获取 GitHub Release Notes..."
+          echo "Tag: v${{ steps.version.outputs.VERSION }}"
+          echo "Target: ${{ github.sha }}"
+          echo "Previous Tag: ${{ steps.last_tag.outputs.LAST_TAG }}"
           
-          if [[ -z "$NOTES" ]]; then
-            echo "" > /tmp/whats_changed.md
-            echo "" > /tmp/full_changelog.md
-            exit 0
+          # 构建参数
+          API_ARGS=("repos/${{ github.repository }}/releases/generate-notes")
+          API_ARGS+=("-f" "tag_name=v${{ steps.version.outputs.VERSION }}")
+          API_ARGS+=("-f" "target_commitish=${{ github.sha }}")
+          
+          if [[ -n "${{ steps.last_tag.outputs.LAST_TAG }}" ]]; then
+            API_ARGS+=("-f" "previous_tag_name=${{ steps.last_tag.outputs.LAST_TAG }}")
           fi
           
-          # 提取 What's Changed 部分
-          echo "$NOTES" | sed -n "/## What's Changed/,/\*\*Full Changelog\*\*/p" | sed '/\*\*Full Changelog\*\*/d' > /tmp/whats_changed.md
+          # 调用 API
+          NOTES=$(gh api "${API_ARGS[@]}" --jq '.body' || echo "")
           
-          # 提取 Full Changelog 链接
-          echo "$NOTES" | grep -o '\*\*Full Changelog\*\*.*' > /tmp/full_changelog.md 2>/dev/null || echo "" > /tmp/full_changelog.md
-          
-          echo "GitHub Release Notes 获取成功"
-          echo "What's Changed:"
-          cat /tmp/whats_changed.md
-          echo "Full Changelog:"
-          cat /tmp/full_changelog.md
+          if [[ -z "$NOTES" ]]; then
+            echo "GitHub Release Notes 获取为空或失败"
+            echo "" > /tmp/github_notes.md
+          else
+            echo "GitHub Release Notes 获取成功"
+            echo "$NOTES" > /tmp/github_notes.md
+            echo "内容预览:"
+            head -n 10 /tmp/github_notes.md
+          fi
 
       # 组合最终的 Release Body
       - name: 组合 Release Body
@@ -490,20 +495,13 @@ jobs:
           # 添加 Overview
           if [[ -s /tmp/overview.md ]]; then
             cat /tmp/overview.md >> "$BODY_FILE"
+            echo "" >> "$BODY_FILE"
+            echo "" >> "$BODY_FILE"
           fi
           
-          # 添加 What's Changed
-          if [[ -s /tmp/whats_changed.md ]]; then
-            echo "" >> "$BODY_FILE"
-            echo "" >> "$BODY_FILE"
-            cat /tmp/whats_changed.md >> "$BODY_FILE"
-          fi
-          
-          # 添加 Full Changelog
-          if [[ -s /tmp/full_changelog.md ]]; then
-            echo "" >> "$BODY_FILE"
-            echo "" >> "$BODY_FILE"
-            cat /tmp/full_changelog.md >> "$BODY_FILE"
+          # 添加 GitHub Notes
+          if [[ -s /tmp/github_notes.md ]]; then
+            cat /tmp/github_notes.md >> "$BODY_FILE"
           fi
           
           # 如果都为空，使用默认内容
