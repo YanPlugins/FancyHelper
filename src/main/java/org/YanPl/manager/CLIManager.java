@@ -476,7 +476,7 @@ public class CLIManager {
                 TextComponent message = new TextComponent(ChatColor.WHITE + "◆ " + timeGreeting + "，");
                 
                 TextComponent playerName = new TextComponent(player.getName());
-                playerName.setColor(net.md_5.bungee.api.ChatColor.of("#30AEE5")); // 自定义亮蓝色
+                playerName.setColor(net.md_5.bungee.api.ChatColor.of(ColorUtil.getColorZ())); // 自定义亮蓝色
                 
                 message.addExtra(playerName);
                 message.addExtra(new TextComponent(ChatColor.WHITE + "。" + randomHelp));
@@ -1396,7 +1396,11 @@ public class CLIManager {
                     for (int j = 0; j < highlightParts.length; j++) {
                         if (j % 2 == 1) {
                             // 高亮部分，使用自定义亮蓝色 #30AEE5
-                            finalMessage.addExtra(net.md_5.bungee.api.ChatColor.of("#30AEE5") + highlightParts[j]);
+                            // 移除内部颜色代码以确保高亮颜色生效
+                            String cleanText = ChatColor.stripColor(highlightParts[j]);
+                            TextComponent highlightComp = new TextComponent(cleanText);
+                            highlightComp.setColor(net.md_5.bungee.api.ChatColor.of(ColorUtil.getColorZ()));
+                            finalMessage.addExtra(highlightComp);
                         } else {
                             // 普通部分，白色显示
                             finalMessage.addExtra(ChatColor.WHITE + highlightParts[j]);

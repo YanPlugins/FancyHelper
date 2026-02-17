@@ -5,9 +5,9 @@ version: 3.5.3
 settings:
   # 是否启用调试模式，启用后会在控制台输出详细调试信息
   debug: false
-  # 是否启用猫娘模式，启用后Fancy将扮演猫娘，注意某些模型(特别是国产模型)可能会拒绝这个要求
+  # 是否启用猫娘模式，启用后Fancy将扮演猫娘，注意某些模型(特别是国产模型如DeepSeek)可能会拒绝这个要求
   meow: true
-  # 补充系统提示词（会自动追加到基础系统提示词后面，不会就留空）
+  # 补充系统提示词（会自动追加到基础系统提示词后面，不加就留空；注意如果是角色扮演类提示词请关闭Meow模式）
   supplementary_prompt: ""
   # CLI 模式会话的自动过期时间 （以分钟为单位）
   timeout_minutes: 10
@@ -47,6 +47,13 @@ settings:
     - ban
     - unban
     - plugman
+    - plm
+    - whitelist
+    - lp
+    - luckperms
+    - data
+    - scoreboard
+    - tag
 
 # 公告配置
 notice:
