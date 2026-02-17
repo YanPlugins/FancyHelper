@@ -32,6 +32,7 @@ public class UpdateManager implements Listener {
     private String latestVersion = null;
     private String downloadUrl = null;
     private String latestFileName = null;
+    private String releaseOverview = null; // Release Overview (AI生成的版本概述)
     private boolean hasUpdate = false;
 
     public UpdateManager(FancyHelper plugin) {
@@ -76,6 +77,13 @@ public class UpdateManager implements Listener {
 
                     latestVersion = jsonObject.get("tag_name").getAsString().replace("v", "");
 
+                    // 获取 Release Overview (body 字段的前半部分，AI 生成的内容)
+                    if (jsonObject.has("body") && !jsonObject.get("body").isJsonNull()) {
+                        String body = jsonObject.get("body").getAsString();
+                        // 提取 Overview 部分（## 🚀 版本概述 到 ## What's Changed 之前）
+                        releaseOverview = extractOverview(body);
+                    }
+
                     // 获取第一个 .jar 文件的下载地址和文件名
                     JsonArray assets = jsonObject.getAsJsonArray("assets");
                     for (JsonElement assetElement : assets) {
@@ -110,6 +118,15 @@ public class UpdateManager implements Listener {
 
                         if (sender != null) {
                             sender.sendMessage("§3FancyHelper§b§r §7> §f检测到新版本: " + ChatColor.WHITE + "v" + latestVersion);
+                            // 显示 Release Overview
+                            if (releaseOverview != null && !releaseOverview.isEmpty()) {
+                                sender.sendMessage("§3FancyHelper§b§r §7> §f更新内容:");
+                                for (String line : releaseOverview.split("\n")) {
+                                    if (!line.trim().isEmpty()) {
+                                        sender.sendMessage(" §b§l> §r" + line);
+                                    }
+                                }
+                            }
                             sender.sendMessage("§3FancyHelper§b§r §7> §f使用 " + ChatColor.AQUA + "/fancy upgrade" + ChatColor.YELLOW + " 自动下载并更新。");
                         }
                     } else {
@@ -302,6 +319,59 @@ public class UpdateManager implements Listener {
     }
 
     /**
+     * 从 Release body 中提取 Overview 部分。
+     * @param body Release body 内容
+     * @return Overview 部分（AI 生成的版本概述）
+     */
+    private String extractOverview(String body) {
+        if (body == null || body.isEmpty()) {
+            return null;
+        }
+        
+        // 查找 "## Overview" 的位置
+        int overviewStart = body.indexOf("## Overview");
+        if (overviewStart == -1) {
+            overviewStart = body.indexOf("## 🚀 版本概述");
+        }
+        if (overviewStart == -1) {
+            overviewStart = body.indexOf("## 版本概述");
+        }
+        if (overviewStart == -1) {
+            overviewStart = body.indexOf("## 🚀");
+        }
+        
+        if (overviewStart == -1) {
+            // 如果找不到特定标记，尝试获取第一段内容
+            overviewStart = 0;
+        }
+        
+        // 查找 "## What's Changed" 或 "## **Full Changelog**" 的位置作为结束
+        int overviewEnd = body.indexOf("## What's Changed");
+        if (overviewEnd == -1) {
+            overviewEnd = body.indexOf("## **Full Changelog**");
+        }
+        if (overviewEnd == -1) {
+            overviewEnd = body.indexOf("## Full Changelog");
+        }
+        
+        if (overviewEnd == -1) {
+            // 如果找不到结束标记，取前500字符或全部内容
+            overviewEnd = Math.min(body.length(), 500);
+        }
+        
+        String overview = body.substring(overviewStart, overviewEnd).trim();
+        
+        // 清理 Markdown 格式，转换为 Minecraft 格式
+        overview = overview.replace("## Overview", "")
+                           .replace("## 🚀 版本概述", "")
+                           .replace("## 版本概述", "")
+                           .replace("## 🚀", "")
+                           .trim();
+        
+        return overview;
+    }
+
+    /**
      * 比较版本号。
      * @param current 当前版本
      * @param latest 最新版本
@@ -341,6 +411,16 @@ public class UpdateManager implements Listener {
         if (hasUpdate && player.isOp()) {
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 player.sendMessage("§3FancyHelper§b§r §7> §f检测到新版本: §a" + latestVersion);
+                // 显示 Release Overview
+                if (releaseOverview != null && !releaseOverview.isEmpty()) {
+                    player.sendMessage("§3FancyHelper§b§r §7> §f更新内容:");
+                    // 将 Overview 按行分割发送，每行前加前缀
+                    for (String line : releaseOverview.split("\n")) {
+                        if (!line.trim().isEmpty()) {
+                            player.sendMessage(" §b§l> §r" + line);
+                        }
+                    }
+                }
                 player.sendMessage("§3FancyHelper§b§r §7> §f使用 §e/fancy upgrade §f自动下载并更新。");
             }, 40L); // 延迟 2 秒提示
         }
