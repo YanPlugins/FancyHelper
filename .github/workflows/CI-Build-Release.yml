@@ -28,6 +28,10 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: write
+  pull-requests: read
+
 env:
   MAVEN_OPTS: -Dmaven.repo.local=${{ github.workspace }}/.m2/repository
 
@@ -84,8 +88,6 @@ jobs:
     if: |
       always() &&
       (needs.test.result == 'success' || needs.test.result == 'skipped')
-    permissions:
-      contents: write
     outputs:
       IS_RELEASE: ${{ steps.check_release.outputs.IS_RELEASE }}
       RELEASE_VERSION: ${{ steps.check_release.outputs.RELEASE_VERSION }}
@@ -526,8 +528,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ build, generate-overview ]
     if: needs.build.outputs.IS_RELEASE == 'true'
-    permissions:
-      contents: write
     steps:
       - name: 下载构建产物
         uses: actions/download-artifact@v4
