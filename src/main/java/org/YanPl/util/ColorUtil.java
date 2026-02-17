@@ -37,23 +37,7 @@ public class ColorUtil {
         return message;
     }
 
-    /**
-     * 仅转换自定义颜色代码 §x 和 §z
-     * 不处理标准的 & 和 § 颜色代码
-     *
-     * @param message 包含颜色代码的消息
-     * @return 转换后的消息
-     */
-    public static String translateCustomColorsOnly(String message) {
-        if (message == null || message.isEmpty()) {
-            return message;
-        }
 
-        message = message.replace("§x", COLOR_X.toString());
-        message = message.replace("§z", COLOR_Z.toString());
-
-        return message;
-    }
 
     /**
      * 获取 §x 对应的颜色值
