@@ -409,35 +409,45 @@ jobs:
           
           # 解析 Responses API 的响应格式
           # 格式: {"output": [{"type": "message", "content": [{"type": "output_text", "text": "..."}]}]}
-          OVERVIEW=""
           
-          # 尝试从 output 数组中提取文本
-          OVERVIEW=$(echo "$RESPONSE_BODY" | jq -r '.output[] | select(.type == "message") | .content[] | select(.type == "output_text") | .text // empty' 2>/dev/null | head -1)
+          # 将响应保存到文件以便调试
+          echo "$RESPONSE_BODY" > /tmp/api_response.json
+          echo "完整响应已保存到 /tmp/api_response.json"
+          echo "响应文件大小: $(wc -c < /tmp/api_response.json) 字节"
           
-          # 如果为空，尝试 result.response 格式
-          if [[ -z "$OVERVIEW" || "$OVERVIEW" == "null" ]]; then
-            OVERVIEW=$(echo "$RESPONSE_BODY" | jq -r '.result.response // empty' 2>/dev/null)
+          # 使用 jq 直接提取文本并写入文件（避免 shell 变量截断问题）
+          # 注意：output 数组中可能有多个元素，需要找到 type="message" 的那个
+          echo "$RESPONSE_BODY" | jq -r '.output[] | select(.type == "message") | .content[] | select(.type == "output_text") | .text // empty' > /tmp/overview.md 2>/dev/null
+          
+          echo "Overview 文件大小: $(wc -c < /tmp/overview.md) 字节"
+          echo "Overview 文件行数: $(wc -l < /tmp/overview.md) 行"
+          
+          # 检查文件是否为空
+          if [[ ! -s /tmp/overview.md ]]; then
+            echo "尝试 result.response 格式..."
+            echo "$RESPONSE_BODY" | jq -r '.result.response // empty' > /tmp/overview.md 2>/dev/null
           fi
           
-          # 如果为空，尝试 OpenAI 兼容格式
-          if [[ -z "$OVERVIEW" || "$OVERVIEW" == "null" ]]; then
-            OVERVIEW=$(echo "$RESPONSE_BODY" | jq -r '.choices[0].message.content // empty' 2>/dev/null)
+          # 检查文件是否为空
+          if [[ ! -s /tmp/overview.md ]]; then
+            echo "尝试 OpenAI 兼容格式..."
+            echo "$RESPONSE_BODY" | jq -r '.choices[0].message.content // empty' > /tmp/overview.md 2>/dev/null
           fi
           
-          # 如果还是为空，检查是否有错误
-          if [[ -z "$OVERVIEW" || "$OVERVIEW" == "null" ]]; then
+          # 检查文件是否为空或只有空白
+          OVERVIEW_CONTENT=$(cat /tmp/overview.md | tr -d '[:space:]')
+          if [[ -z "$OVERVIEW_CONTENT" ]]; then
             ERROR_MSG=$(echo "$RESPONSE_BODY" | jq -r '.errors[0].message // .error // empty' 2>/dev/null)
             if [[ -n "$ERROR_MSG" && "$ERROR_MSG" != "null" ]]; then
               echo "API 错误: $ERROR_MSG"
             fi
             echo "AI 响应为空，使用默认Overview"
-            echo "## Overview" > /tmp/overview.md
-            echo "* 本次更新包含多项功能改进和问题修复" >> /tmp/overview.md
+            printf "## Overview\n* 本次更新包含多项功能改进和问题修复\n" > /tmp/overview.md
           else
-            # 处理换行：将字面的 \n 转换为实际换行
-            echo "$OVERVIEW" | sed 's/\\n/\n/g' > /tmp/overview.md
-            echo "AI Overview 生成成功"
+            echo "AI Overview 生成成功，内容如下:"
+            echo "=== Overview 开始 ==="
             cat /tmp/overview.md
+            echo "=== Overview 结束 ==="
           fi
 
       # 获取 GitHub 自动生成的 Release Notes
