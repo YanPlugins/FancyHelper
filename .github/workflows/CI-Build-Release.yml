@@ -86,6 +86,9 @@ jobs:
       (needs.test.result == 'success' || needs.test.result == 'skipped')
     permissions:
       contents: write
+    outputs:
+      IS_RELEASE: ${{ steps.check_release.outputs.IS_RELEASE }}
+      RELEASE_VERSION: ${{ steps.check_release.outputs.RELEASE_VERSION }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -98,9 +101,21 @@ jobs:
           git fetch origin master --tags
           IS_RELEASE=false
           RELEASE_VERSION=""
+          SHORT_SHA="${GITHUB_SHA::7}"
 
-          # 情况1: Push Tag
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          # 情况1: 手动触发-发布正式包
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.build_type }}" == "release" ]]; then
+            echo "Event is workflow_dispatch release"
+            IS_RELEASE=true
+            if [[ -n "${{ inputs.custom_version }}" ]]; then
+              RELEASE_VERSION="${{ inputs.custom_version }}"
+            else
+              RELEASE_VERSION="$SHORT_SHA"
+            fi
+            echo "Manual release version: $RELEASE_VERSION"
+
+          # 情况2: Push Tag
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             echo "Event is Push Tag"
             if git branch -r --contains ${{ github.sha }} | grep -q 'origin/master'; then
               IS_RELEASE=true
@@ -110,7 +125,7 @@ jobs:
               echo "Tag is NOT on master. Skipping release."
             fi
 
-          # 情况2: Push to master
+          # 情况3: Push to master
           elif [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
             echo "Event is Push to master"
             TAG=$(git tag --points-at HEAD | grep '^v' | head -n 1)
@@ -142,7 +157,6 @@ jobs:
 
       # 生成短SHA（手动触发快照包也需要）
       - name: 生成短 SHA
-        if: github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         id: sha
         run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
@@ -242,15 +256,159 @@ jobs:
           name: FancyHelper-manual-release-${{ inputs.custom_version || steps.sha.outputs.SHORT_SHA }}
           path: target/FancyHelper-*.jar
 
-      # 原有逻辑-发布正式Release
-      - name: 发布正式 Release
+      # 正式Release上传artifact
+      - name: 上传正式Release包
         if: steps.check_release.outputs.IS_RELEASE == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: FancyHelper-release-${{ steps.check_release.outputs.RELEASE_VERSION }}
+          path: target/FancyHelper-*.jar
+
+  # ==================== AI 生成发行注记 Overview ====================
+  generate-overview:
+    name: AI 生成发行注记
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    if: needs.build.outputs.IS_RELEASE == 'true'
+    outputs:
+      ai_overview: ${{ steps.ai_result.outputs.OVERVIEW }}
+      github_notes: ${{ steps.github_notes.outputs.NOTES }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 获取版本号（从build job继承）
+      - name: 获取版本号
+        id: version
+        run: |
+          VERSION="${{ needs.build.outputs.RELEASE_VERSION }}"
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      # 安装 GitHub CLI
+      - name: 安装 GitHub CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gh
+
+      # 获取上次 Release 的 tag
+      - name: 获取上次 Release Tag
+        id: last_tag
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          echo "LAST_TAG=$LAST_TAG" >> $GITHUB_OUTPUT
+          echo "上次 Release Tag: $LAST_TAG"
+
+      # 获取自上次 tag 以来的 commits
+      - name: 获取 Commits 变化
+        id: commits
+        run: |
+          if [[ -n "${{ steps.last_tag.outputs.LAST_TAG }}" ]]; then
+            COMMITS=$(git log ${{ steps.last_tag.outputs.LAST_TAG }}..HEAD --pretty=format:"%s (%h)" 2>/dev/null || echo "无")
+          else
+            # 没有上次tag，获取所有commits
+            COMMITS=$(git log --pretty=format:"%s (%h)" -20 2>/dev/null || echo "无")
+          fi
+          echo "COMMITS<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "Commits: $COMMITS"
+
+      # 获取仓库信息
+      - name: 获取仓库信息
+        id: repo_info
+        run: |
+          echo "REPO_NAME=${{ github.repository }}" >> $GITHUB_OUTPUT
+          echo "REPO_OWNER=${{ github.repository_owner }}" >> $GITHUB_OUTPUT
+
+      # 调用 CloudFlare AI 生成 Overview
+      - name: 调用 AI 生成发行注记 Overview
+        id: ai_result
+        run: |
+          # 获取 account-id
+          ACCOUNT_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_KEY }}" \
+            "https://api.cloudflare.com/client/v4/accounts" | jq -r '.result[0].id')
+          
+          if [[ -z "$ACCOUNT_ID" || "$ACCOUNT_ID" == "null" ]]; then
+            echo "无法获取 CloudFlare Account ID，使用默认Overview"
+            echo "OVERVIEW=## 🚀 版本概述\n\n本次更新包含多项功能改进和问题修复。" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # 构建 prompt
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          COMMITS="${{ steps.commits.outputs.COMMITS }}"
+          
+          PROMPT="你是一个专业的版本发布助手。请根据以下 Git commits 信息，为 FancyHelper Minecraft 插件生成一段中文的发行注记 Overview（简洁摘要）。\n\n版本号: v$VERSION\n\nCommits 列表:\n$COMMITS\n\n要求：\n1. 用中文撰写\n2. 简洁明了，控制在 100-200 字\n3. 突出主要功能更新、bug修复和重要改动\n4. 使用 emoji 增加可读性\n5. 直接输出内容，不要有开场白\n6. 使用 Markdown 格式，以 ## 🚀 版本概述 开头\n\n请生成发行注记 Overview："
+          
+          # 调用 CloudFlare AI API
+          RESPONSE=$(curl -s -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/ai/v1/chat/completions" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\
+              \"model\": \"@cf/openai/gpt-oss-120b\",\n\
+              \"messages\": [\n                {\"role\": \"system\", \"content\": \"你是一个专业的版本发布助手，擅长撰写简洁明了的中文发行注记。\"},\n                {\"role\": \"user\", \"content\": \"$PROMPT\"}\n              ],\n              \"max_tokens\": 500\n            }")
+          
+          # 解析 AI 响应
+          OVERVIEW=$(echo "$RESPONSE" | jq -r '.result.response // .result.message.content // ""' 2>/dev/null)
+          
+          if [[ -z "$OVERVIEW" || "$OVERVIEW" == "null" ]]; then
+            echo "AI 响应为空，使用默认Overview"
+            echo "OVERVIEW=## 🚀 版本概述\n\n本次更新包含多项功能改进和问题修复。" >> $GITHUB_OUTPUT
+          else
+            # 转义 JSON 字符串中的特殊字符
+            OVERVIEW_ESCAPED=$(echo "$OVERVIEW" | jq -Rs '.')
+            echo "OVERVIEW=$OVERVIEW_ESCAPED" >> $GITHUB_OUTPUT
+            echo "AI Overview 生成成功"
+            echo "$OVERVIEW"
+          fi
+
+      # 获取 GitHub 自动生成的 Release Notes
+      - name: 获取 GitHub Release Notes
+        id: github_notes
+        run: |
+          # 使用 GitHub API 生成 release notes
+          NOTES=$(gh api \
+            "repos/${{ github.repository }}/releases/generate-notes" \
+            -f tag_name="v${{ steps.version.outputs.VERSION }}" \
+            -f target_commitish="${{ github.sha }}" \
+            --jq '.body' 2>/dev/null || echo "")
+          
+          if [[ -z "$NOTES" ]]; then
+            NOTES="暂无详细发行说明"
+          fi
+          
+          # 转义并输出
+          NOTES_ESCAPED=$(echo "$NOTES" | jq -Rs '.')
+          echo "NOTES=$NOTES_ESCAPED" >> $GITHUB_OUTPUT
+          echo "GitHub Release Notes 获取成功"
+
+  # ==================== 发布正式 Release ====================
+  release:
+    name: 发布 Release
+    runs-on: ubuntu-latest
+    needs: [ build, generate-overview ]
+    if: needs.build.outputs.IS_RELEASE == 'true'
+    permissions:
+      contents: write
+    steps:
+      # 判断artifact名称（简化逻辑：直接查找匹配的最新artifact）
+      - name: 下载构建产物
+        uses: actions/download-artifact@v4
+        with:
+          pattern: FancyHelper-*
+          path: target/
+          merge-multiple: true
+
+      - name: 发布正式 Release
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           files: target/FancyHelper-*.jar
-          tag_name: v${{ steps.check_release.outputs.RELEASE_VERSION }}
-          name: Release v${{ steps.check_release.outputs.RELEASE_VERSION }}
+          tag_name: v${{ needs.build.outputs.RELEASE_VERSION }}
+          name: Release v${{ needs.build.outputs.RELEASE_VERSION }}
           target_commitish: ${{ github.sha }}
-          generate_release_notes: true
+          body: ${{ needs.generate-overview.outputs.ai_overview }}${{ needs.generate-overview.outputs.github_notes }}
           make_latest: true
