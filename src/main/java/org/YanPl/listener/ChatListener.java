@@ -72,10 +72,17 @@ public class ChatListener implements Listener {
         // 如果是 Paper 环境且我们已经注册了现代监听器，则跳过此事件以避免重复处理
         if (paperChatEventExists) return;
         
-        handleChatInternal(event.getPlayer(), event.getMessage(), () -> {
-            event.getRecipients().clear();
-            event.setCancelled(true);
-        });
+        String message = event.getMessage();
+        if (!plugin.getCliManager().handleChat(event.getPlayer(), message)) {
+            if (message.startsWith("！")) {
+                event.setMessage(message.substring(1));
+            } else if (message.startsWith("!")) {
+                event.setMessage(message.substring(1));
+            }
+            return;
+        }
+        event.getRecipients().clear();
+        event.setCancelled(true);
     }
 
     /**
@@ -106,12 +113,21 @@ public class ChatListener implements Listener {
                         Method serializeMethod = serializer.getClass().getMethod("serialize", Class.forName("net.kyori.adventure.text.Component"));
                         String message = (String) serializeMethod.invoke(serializer, component);
 
-                        handleChatInternal(player, message, () -> {
-                            try {
-                                Method setCancelledMethod = event.getClass().getMethod("setCancelled", boolean.class);
-                                setCancelledMethod.invoke(event, true);
-                            } catch (Exception ignored) {}
-                        });
+                        if (!plugin.getCliManager().handleChat(player, message)) {
+                            if (message.startsWith("！") || message.startsWith("!")) {
+                                String newMessage = message.substring(1);
+                                Class<?> componentClass = Class.forName("net.kyori.adventure.text.Component");
+                                Method textMethod = componentClass.getMethod("text", String.class);
+                                Object newComponent = textMethod.invoke(null, newMessage);
+                                Method setMethod = event.getClass().getMethod("message", componentClass);
+                                setMethod.invoke(event, newComponent);
+                            }
+                            return;
+                        }
+                        try {
+                            Method setCancelledMethod = event.getClass().getMethod("setCancelled", boolean.class);
+                            setCancelledMethod.invoke(event, true);
+                        } catch (Exception ignored) {}
                     } catch (Exception e) {
                         plugin.getLogger().warning("处理 Paper 聊天事件时出错: " + e.getMessage());
                     }
@@ -123,12 +139,6 @@ public class ChatListener implements Listener {
         } catch (Exception e) {
             plugin.getLogger().warning("无法注册 Paper 聊天监听器，将回退到标准监听器: " + e.getMessage());
             paperChatEventExists = false;
-        }
-    }
-
-    private void handleChatInternal(Player player, String message, Runnable cancelAction) {
-        if (plugin.getCliManager().handleChat(player, message)) {
-            cancelAction.run();
         }
     }
 }
