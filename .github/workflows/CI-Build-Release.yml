@@ -319,22 +319,23 @@ jobs:
       # 调用 CloudFlare AI 生成 Overview
       - name: 调用 AI 生成发行注记 Overview
         id: ai_result
+        env:
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
+          PRS: ${{ steps.prs.outputs.PRS }}
+          COMMITS: ${{ steps.commits.outputs.COMMITS }}
         run: |
-          ACCOUNT_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_KEY }}" \
+          ACCOUNT_ID=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_KEY" \
             "https://api.cloudflare.com/client/v4/accounts" | jq -r '.result[0].id')
-          
+
           if [[ -z "$ACCOUNT_ID" || "$ACCOUNT_ID" == "null" ]]; then
             echo "无法获取 CloudFlare Account ID，使用默认Overview"
             echo "## Overview" > /tmp/overview.md
             echo "* 本次更新包含多项功能改进和问题修复" >> /tmp/overview.md
             exit 0
           fi
-          
+
           echo "Account ID: $ACCOUNT_ID"
-          
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          PRS="${{ steps.prs.outputs.PRS }}"
-          COMMITS="${{ steps.commits.outputs.COMMITS }}"
           
           # 构建 prompt 并写入文件
           echo "你是一个专业的版本发布助手。请根据以下 Pull Request 和 Commit 信息，为 FancyHelper Minecraft 插件生成中文的发行注记 Overview。" > /tmp/prompt.txt
