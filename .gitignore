@@ -3,7 +3,7 @@
 .vscode/
 .trae
 AGENTS.md
-
+.settings/
 *.iml
 *.ipr
 *.iws
