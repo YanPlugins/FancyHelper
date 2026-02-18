@@ -1617,6 +1617,10 @@ public class CLIManager {
         return activeCLIPayers.size();
     }
 
+    public boolean isInCLI(Player player) {
+        return activeCLIPayers.contains(player.getUniqueId());
+    }
+
     // ==================== 公共访问方法（供 ToolExecutor 使用）====================
 
     /**
