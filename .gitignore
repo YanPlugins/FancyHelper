@@ -2,11 +2,12 @@
 .idea/
 .vscode/
 .trae
-AGENTS.md
+
 .settings/
 *.iml
 *.ipr
 *.iws
+AGENT.md
 
 # IntelliJ
 out/
