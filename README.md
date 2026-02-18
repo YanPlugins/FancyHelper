@@ -37,7 +37,7 @@ FancyHelper 是一款基于 AI 驱动的 Minecraft 服务器管理助手插件�
 ## 📋 要求
 
 - **Java**: 17 或更高版本
-- **服务器版本**: Spigot/Paper 1.18 - 1.21
+- **服务器版本**: Spigot/Paper 1.18+
 - **网络**: 服务器需能访问 CloudFlare API 接口
 - **依赖**: [ProtocolLib](https://www.spigotmc.org/resources/protocollib.1997/) 5.4.0+（用于命令输出捕获）
 
@@ -107,12 +107,17 @@ metaso:
 - 预览 AI 生成的指令，确认无误后确认执行。
 
 **交互指令**：
+
 - `exit` - 退出 CLI 模式
 - `stop` - 打断当前 AI 生成或取消待处理操作
 - `y` / `n` - 确认或取消执行命令
 - `agree` - 同意用户协议或 YOLO 协议
+- `/cli retry` - 重试上一次 AI 响应
+- `/cli exempt_anti_loop` - 为当前对话开启防死循环豁免
+- `!` 或 `！` 开头的消息 - 忽略 CLI 拦截，正常发送聊天消息
 
 **YOLO 模式**：
+
 - 输入 `agree` 同意 YOLO 协议后，大部分 AI 生成的指令会自动执行
 - 但对于高风险命令（如 op、ban、stop、reload 等），仍需手动确认
 - 风险命令列表可在 `config.yml` 的 `settings.yolo_risk_commands` 中配置
@@ -156,7 +161,7 @@ FancyHelper 会自动检测此问题并尝试将 `server.properties` 中的 `enf
 
 ### 旧插件清理
 
-插件启动时会自动清理旧版本的 Fancyhelper（或MineAgent） 插件文件，并将移动到 `plugins/FancyHelper/old/` 目录，防止干扰。
+插件启动时会自动清理旧版本的 FancyHelper（或 MineAgent）插件文件，并将移动到 `plugins/FancyHelper/old/` 目录，防止干扰。
 
 **注意事项**：
 
@@ -169,6 +174,12 @@ FancyHelper 会自动检测此问题并尝试将 `server.properties` 中的 `enf
 | :--- | :--- | :--- |
 | `/fancyhelper` | 插件主指令 (别名: `/cli`, `/fancy`) | `fancyhelper.cli` |
 | `/fancyhelper reload` | 重载插件配置 | `fancyhelper.reload` |
+
+| 权限 | 描述 | 默认 |
+| :--- | :--- | :--- |
+| `fancyhelper.cli` | 允许使用 CLI 模式 | OP |
+| `fancyhelper.reload` | 允许重载配置 | OP |
+| `fancyhelper.notice` | 允许查看插件公告 | OP |
 
 ## 🛠️ 开发与构建
 
