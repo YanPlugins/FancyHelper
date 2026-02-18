@@ -663,6 +663,9 @@ public class CLIManager {
 
         // 如果玩家处于 CLI 模式
         if (activeCLIPayers.contains(uuid)) {
+            if (message.startsWith("！") || message.startsWith("!")) {
+                return false;
+            }
             plugin.getLogger().info("[CLI] 拦截到来自 " + player.getName() + " 的消息: " + message);
             if (message.equalsIgnoreCase("exit")) {
                 exitCLI(player);
