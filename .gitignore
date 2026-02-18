@@ -8,6 +8,7 @@
 *.ipr
 *.iws
 AGENT.md
+.classpath
 
 # IntelliJ
 out/

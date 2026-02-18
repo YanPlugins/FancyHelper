@@ -69,15 +69,17 @@ public class ChatListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onPlayerChat(AsyncPlayerChatEvent event) {
-        // 如果是 Paper 环境且我们已经注册了现代监听器，则跳过此事件以避免重复处理
         if (paperChatEventExists) return;
         
         String message = event.getMessage();
-        if (!plugin.getCliManager().handleChat(event.getPlayer(), message)) {
-            if (message.startsWith("！")) {
-                event.setMessage(message.substring(1));
-            } else if (message.startsWith("!")) {
-                event.setMessage(message.substring(1));
+        Player player = event.getPlayer();
+        if (!plugin.getCliManager().handleChat(player, message)) {
+            if (plugin.getCliManager().isInCLI(player)) {
+                if (message.startsWith("！")) {
+                    event.setMessage(message.substring(1));
+                } else if (message.startsWith("!")) {
+                    event.setMessage(message.substring(1));
+                }
             }
             return;
         }
@@ -114,13 +116,15 @@ public class ChatListener implements Listener {
                         String message = (String) serializeMethod.invoke(serializer, component);
 
                         if (!plugin.getCliManager().handleChat(player, message)) {
-                            if (message.startsWith("！") || message.startsWith("!")) {
-                                String newMessage = message.substring(1);
-                                Class<?> componentClass = Class.forName("net.kyori.adventure.text.Component");
-                                Method textMethod = componentClass.getMethod("text", String.class);
-                                Object newComponent = textMethod.invoke(null, newMessage);
-                                Method setMethod = event.getClass().getMethod("message", componentClass);
-                                setMethod.invoke(event, newComponent);
+                            if (plugin.getCliManager().isInCLI(player)) {
+                                if (message.startsWith("！") || message.startsWith("!")) {
+                                    String newMessage = message.substring(1);
+                                    Class<?> componentClass = Class.forName("net.kyori.adventure.text.Component");
+                                    Method textMethod = componentClass.getMethod("text", String.class);
+                                    Object newComponent = textMethod.invoke(null, newMessage);
+                                    Method setMethod = event.getClass().getMethod("message", componentClass);
+                                    setMethod.invoke(event, newComponent);
+                                }
                             }
                             return;
                         }
