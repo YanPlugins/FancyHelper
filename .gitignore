@@ -2,6 +2,7 @@
 .idea/
 .vscode/
 .trae
+AGENTS.md
 
 *.iml
 *.ipr
@@ -114,3 +115,4 @@ buildNumber.properties
 
 # Common working directory
 run/
+.opencode
