@@ -104,6 +104,7 @@ public class CLICommand implements CommandExecutor, TabCompleter {
             case "settings":
             case "set":
             case "toggle":
+            case "tools":
             case "display":
             case "select":
             case "exempt_anti_loop":
@@ -190,17 +191,20 @@ public class CLICommand implements CommandExecutor, TabCompleter {
                         if (currentState) {
                             plugin.getConfigManager().setPlayerToolEnabled(player, tool, false);
                             player.sendMessage(ChatColor.YELLOW + "工具 " + tool + " 已禁用。下次开启需要重新验证。");
-                            handleSettings(player);
+                            handleTools(player);
                         } else {
                             player.sendMessage(ChatColor.AQUA + "正在为工具 " + tool + " 发起安全验证...");
                             plugin.getVerificationManager().startVerification(player, tool, () -> {
                                 plugin.getConfigManager().setPlayerToolEnabled(player, tool, true);
                                 player.sendMessage(ChatColor.GREEN + "验证成功！工具 " + tool + " 已启用。");
-                                handleSettings(player);
+                                handleTools(player);
                             });
                         }
                     }
                 }
+                return true;
+            case "tools":
+                handleTools(player);
                 return true;
             case "display":
                 String currentPos = plugin.getConfigManager().getPlayerDisplayPosition(player);
@@ -323,9 +327,13 @@ public class CLICommand implements CommandExecutor, TabCompleter {
 
     private void handleSettings(Player player) {
         player.sendMessage(ChatColor.GOLD + "--- FancyHelper 设置 ---");
-        sendToggleMessage(player, "ls", "列出文件列表");
-        sendToggleMessage(player, "read", "读取文件内容");
-        sendToggleMessage(player, "diff", "修改文件内容");
+        
+        TextComponent toolsBtn = new TextComponent(ChatColor.WHITE + "- 工具权限: ");
+        TextComponent toolsStatus = new TextComponent(ChatColor.YELLOW + "[管理]");
+        toolsStatus.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli tools"));
+        toolsStatus.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击管理文件工具权限")));
+        toolsBtn.addExtra(toolsStatus);
+        player.spigot().sendMessage(toolsBtn);
         
         String displayPos = plugin.getConfigManager().getPlayerDisplayPosition(player);
         TextComponent displayMsg = new TextComponent(ChatColor.WHITE + "- 状态显示位置: ");
@@ -335,16 +343,25 @@ public class CLICommand implements CommandExecutor, TabCompleter {
         displayMsg.addExtra(posStatus);
         player.spigot().sendMessage(displayMsg);
 
-        player.sendMessage(ChatColor.GRAY + "");
-
         TextComponent memoryBtn = new TextComponent(ChatColor.WHITE + "- 记忆管理: ");
         TextComponent enterBtn = new TextComponent(ChatColor.YELLOW + "[管理]");
         enterBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli memory"));
         enterBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击管理偏好记忆")));
         memoryBtn.addExtra(enterBtn);
         player.spigot().sendMessage(memoryBtn);
+    }
 
+    private void handleTools(Player player) {
+        player.sendMessage(ChatColor.GOLD + "--- 工具权限管理 ---");
+        sendToggleMessage(player, "ls", "列出文件列表");
+        sendToggleMessage(player, "read", "读取文件内容");
+        sendToggleMessage(player, "diff", "修改文件内容");
         player.sendMessage(ChatColor.GRAY + "注意：工具关闭后再开启需要重新进行安全验证。");
+        
+        TextComponent backBtn = new TextComponent(ChatColor.GRAY + "[返回设置]");
+        backBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli settings"));
+        backBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击返回设置界面")));
+        player.spigot().sendMessage(backBtn);
     }
 
     private void handleMemory(Player player, String[] args) {
@@ -566,7 +583,7 @@ public class CLICommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> subCommands = new ArrayList<>(Arrays.asList("reload", "status", "yolo", "normal", "checkupdate", "upgrade", "read", "set", "settings", "display", "toggle", "notice", "retry", "todo", "memory"));
+            List<String> subCommands = new ArrayList<>(Arrays.asList("reload", "status", "yolo", "normal", "checkupdate", "upgrade", "read", "set", "settings", "tools", "display", "toggle", "notice", "retry", "todo", "memory"));
             return subCommands.stream()
                     .filter(s -> s.startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());

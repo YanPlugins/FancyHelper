@@ -39,9 +39,9 @@ public class PromptManager {
         sb.append("Available Presets: ").append(String.join(", ", plugin.getWorkspaceIndexer().getIndexedPresets())).append("\n\n");
 
         // ==================== Language Rule / 语言规则 ====================
-        // 【语言规则】必须使用中文（简体中文）回复
+        // 【语言规则】默认使用简体中文回复，除非玩家偏好另有说明
         sb.append("[Language]\n");
-        sb.append("You MUST respond in Chinese (Simplified Chinese). All your replies should be in Chinese.\n\n");
+        sb.append("By default, respond in Simplified Chinese. However, if the player's preferences specify a different language, follow the player's preference.\n\n");
 
         // ==================== Basic Rules / 基础规则 ====================
         // 【基础规则】
