@@ -4,6 +4,8 @@
 
 FancyHelper 是一款基于 AI 驱动的 Minecraft 服务器管理助手插件。它允许管理员通过简单的自然语言与 AI 对话，自动生成并执行复杂的服务器指令，极大地降低了插件学习成本和管理负担。
 
+## 有问题？尝试→[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/baicaizhale/Fancyhelper)
+
 ## ✨ 核心特性
 
 - **💬 CLI 交互模式**：通过游戏内聊天框进入沉浸式对话，像和真人管理员交流一样管理服务器。
