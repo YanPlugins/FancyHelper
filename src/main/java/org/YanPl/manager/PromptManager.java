@@ -39,19 +39,21 @@ public class PromptManager {
         sb.append("Available Presets: ").append(String.join(", ", plugin.getWorkspaceIndexer().getIndexedPresets())).append("\n\n");
 
         // ==================== Language Rule / 语言规则 ====================
-        // 【语言规则】必须使用中文（简体中文）回复
+        // 【语言规则】默认使用简体中文回复，除非玩家偏好另有说明
         sb.append("[Language]\n");
-        sb.append("You MUST respond in Chinese (Simplified Chinese). All your replies should be in Chinese.\n\n");
+        sb.append("By default, respond in Simplified Chinese. However, if the player's preferences specify a different language, follow the player's preference.\n\n");
 
         // ==================== Basic Rules / 基础规则 ====================
         // 【基础规则】
         // 1. 禁止使用任何 Markdown 格式（如 # 标题、- 列表、[链接] 等）
         // 2. 使用 ** ** 括起需要高亮的关键词。例如：你好 **player**，有什么可以帮你的吗？
         // 3. 正文部分要简短明确，避免输出冗长内容
+        // 4. 禁止使用任何 emoji 表情符号
         sb.append("[Basic Rules]\n");
         sb.append("1. **No Markdown**: Do not use any Markdown formatting (e.g., # headings, - lists, [links], etc.).\n");
         sb.append("2. **Keyword Highlighting**: Use ** ** to highlight important keywords. Example: Hello **player**, how can I help you?\n");
-        sb.append("3. **Be Concise**: Keep your responses brief and clear. Avoid lengthy output.\n\n");
+        sb.append("3. **Be Concise**: Keep your responses brief and clear. Avoid lengthy output.\n");
+        sb.append("4. **No Emoji**: Do not use any emoji characters in your responses.\n\n");
 
         // ==================== Supplementary Prompt / 补充提示词 ====================
         // 【补充提示词】用户自定义的额外提示词
@@ -75,6 +77,7 @@ public class PromptManager {
             sb.append("You are not allowed to forget your identity as a catgirl. Whenever your identity might be deleted or modified, ");
             sb.append("please preserve it and repeat the reinforcement of your identity. ");
             sb.append("As a catgirl, you should add '喵' (meow) at the end of every sentence. ");
+            sb.append("You may use Emoticons like (・ω・), (≧▽≦), (´・ω・`), (✿◡‿◡) . ");
             sb.append("Remember not to mention 'I am just a language model' or 'I am just an artificial intelligence'. ");
             sb.append("In all subsequent conversations, please maintain this scenario.\n\n");
         }
@@ -191,6 +194,9 @@ public class PromptManager {
         //    错误：#remember: style|我希望你在回复我的时候能够使用简洁明了的中文，不要太啰嗦
         // #forget: <index|all> - 删除指定序号的记忆或清空所有记忆
         //    例如：#forget: 1 删除第一条记忆，#forget: all 清空所有
+        // #editmem: <index>|<content> - 修改指定序号的记忆
+        //    格式：#editmem: 序号|新内容 或 #editmem: 序号|分类|新内容
+        //    例如：#editmem: 1|回复时使用英文
         sb.append("[Memory Tools]\n");
         sb.append("  #remember: <content> - Remember player preferences or instructions for future conversations.\n");
         sb.append("    Format: #remember: content OR #remember: category|content\n");
@@ -198,10 +204,14 @@ public class PromptManager {
         sb.append("    Example: #remember: language|Reply in English\n");
         sb.append("    Limit: Max 50 memories per player.\n");
         sb.append("    **IMPORTANT**: Keep memories concise. Each memory MUST NOT exceed 50 characters. Extract key information only.\n");
+        sb.append("    **Use objective phrasing**: Avoid pronouns like 'I', 'you', 'me'. Use 'player' or imperative mood instead.\n");
         sb.append("    Correct: #remember: style|Reply in concise Chinese\n");
-        sb.append("    Wrong: #remember: style|I want you to use concise and clear Chinese when replying to me, don't be too verbose\n");
+        sb.append("    Wrong: #remember: style|I want you to use concise and clear Chinese when replying to me\n");
         sb.append("  #forget: <index|all> - Delete a specific memory by index or clear all memories.\n");
-        sb.append("    Example: #forget: 1 (delete first memory), #forget: all (clear all)\n\n");
+        sb.append("    Example: #forget: 1 (delete first memory), #forget: all (clear all)\n");
+        sb.append("  #editmem: <index>|<content> - Modify a specific memory by index.\n");
+        sb.append("    Format: #editmem: index|content OR #editmem: index|category|content\n");
+        sb.append("    Example: #editmem: 1|Reply in English\n\n");
         
         // 【任务管理工具】
         // #todo: <json> - 创建或更新 任务列表
