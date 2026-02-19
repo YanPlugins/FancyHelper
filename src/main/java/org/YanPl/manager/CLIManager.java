@@ -998,7 +998,7 @@ public class CLIManager {
         String toolCall = "";
 
         // 定义已知工具列表
-        List<String> knownTools = Arrays.asList("#over", "#exit", "#run", "#getpreset", "#choose", "#search", "#ls", "#read", "#diff", "#todo", "#remember", "#forget", "#recall");
+        List<String> knownTools = Arrays.asList("#over", "#exit", "#run", "#getpreset", "#choose", "#search", "#ls", "#read", "#diff", "#todo", "#remember", "#forget");
 
         int currentPos = 0;
         boolean foundTool = false;

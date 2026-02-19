@@ -138,7 +138,7 @@ public final class FancyHelper extends JavaPlugin {
             // 使用 ANSI 颜色代码：\u001B[38;5;81m 深青色, \u001B[38;5;208m 橙色, \u001B[36m 青色, \u001B[38;5;155m 灰色, \u001B[0m 重置
             getLogger().info(" \u001B[38;5;81m_\u001B[0m       ");
             getLogger().info("\u001B[38;5;81m|_\u001B[0m   \u001B[38;5;81m|_|\u001B[0m   \u001B[38;5;208mFancyHelper\u001B[0m \u001B[36mv" + getDescription().getVersion() + "\u001B[0m");
-            getLogger().info("\u001B[38;5;81m|\u001B[0m    \u001B[38;5;81m| |\u001B[0m   \u001B[38;5;155mRunning on Bukkit - " + getServer().getName().split("-")[0] + "\u001B[0m");
+            getLogger().info("\u001B[38;5;81m|\u001B[0m    \u001B[38;5;81m| |\u001B[0m   \u001B[38;5;155mRunning on Spigot - " + getServer().getName().split("-")[0] + "\u001B[0m");
             getLogger().info("");
 
             // 尝试同步命令，修复热重载后的 Brigadier 缓存问题

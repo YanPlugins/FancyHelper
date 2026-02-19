@@ -191,7 +191,6 @@ public class PromptManager {
         //    错误：#remember: style|我希望你在回复我的时候能够使用简洁明了的中文，不要太啰嗦
         // #forget: <index|all> - 删除指定序号的记忆或清空所有记忆
         //    例如：#forget: 1 删除第一条记忆，#forget: all 清空所有
-        // #recall - 查看当前所有记忆列表
         sb.append("[Memory Tools]\n");
         sb.append("  #remember: <content> - Remember player preferences or instructions for future conversations.\n");
         sb.append("    Format: #remember: content OR #remember: category|content\n");
@@ -202,8 +201,7 @@ public class PromptManager {
         sb.append("    Correct: #remember: style|Reply in concise Chinese\n");
         sb.append("    Wrong: #remember: style|I want you to use concise and clear Chinese when replying to me, don't be too verbose\n");
         sb.append("  #forget: <index|all> - Delete a specific memory by index or clear all memories.\n");
-        sb.append("    Example: #forget: 1 (delete first memory), #forget: all (clear all)\n");
-        sb.append("  #recall - View all current memories.\n\n");
+        sb.append("    Example: #forget: 1 (delete first memory), #forget: all (clear all)\n\n");
         
         // 【任务管理工具】
         // #todo: <json> - 创建或更新 任务列表
