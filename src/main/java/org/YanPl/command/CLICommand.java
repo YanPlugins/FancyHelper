@@ -5,6 +5,7 @@ import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.hover.content.Text;
 import org.YanPl.FancyHelper;
+import org.YanPl.manager.InstructionManager;
 import org.YanPl.model.DialogueSession;
 import org.YanPl.util.ColorUtil;
 import org.bukkit.Bukkit;
@@ -108,6 +109,8 @@ public class CLICommand implements CommandExecutor, TabCompleter {
             case "exempt_anti_loop":
             case "todo":
             case "retry":
+            case "memory":
+            case "mem":
                 if (!(sender instanceof Player)) {
                     sender.sendMessage(ChatColor.RED + "该子命令仅限玩家使用。");
                     return true;
@@ -142,6 +145,7 @@ public class CLICommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(" §7- §b/cli reload §f: 重新加载配置与工作区");
         sender.sendMessage(" §7- §b/cli status §f: 查看插件运行状态");
         sender.sendMessage(" §7- §b/cli settings §f: 打开个人设置界面");
+        sender.sendMessage(" §7- §b/cli memory §f: 管理偏好记忆");
         sender.sendMessage(" §7- §b/cli notice §f: 查看系统公告");
         sender.sendMessage(" §7- §b/cli retry §f: 重试上一次失败的 AI 调用");
         sender.sendMessage(" §7- §b/cli todo §f: 查看待办事项列表");
@@ -219,6 +223,10 @@ public class CLICommand implements CommandExecutor, TabCompleter {
                 return true;
             case "todo":
                 plugin.getCliManager().openTodoBook(player);
+                return true;
+            case "memory":
+            case "mem":
+                handleMemory(player, args);
                 return true;
         }
         return true;
@@ -327,7 +335,193 @@ public class CLICommand implements CommandExecutor, TabCompleter {
         displayMsg.addExtra(posStatus);
         player.spigot().sendMessage(displayMsg);
 
+        player.sendMessage(ChatColor.GRAY + "");
+
+        TextComponent memoryBtn = new TextComponent(ChatColor.WHITE + "- 记忆管理: ");
+        TextComponent enterBtn = new TextComponent(ChatColor.YELLOW + "[管理]");
+        enterBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli memory"));
+        enterBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击管理偏好记忆")));
+        memoryBtn.addExtra(enterBtn);
+        player.spigot().sendMessage(memoryBtn);
+
         player.sendMessage(ChatColor.GRAY + "注意：工具关闭后再开启需要重新进行安全验证。");
+    }
+
+    private void handleMemory(Player player, String[] args) {
+        if (args.length == 1) {
+            showMemoryList(player);
+        } else if (args.length >= 2) {
+            String action = args[1].toLowerCase();
+            switch (action) {
+                case "add":
+                case "new":
+                    if (args.length >= 3) {
+                        String content = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
+                        handleMemoryAdd(player, content);
+                    } else {
+                        player.sendMessage(ChatColor.RED + "用法: /cli memory add <内容> 或 /cli memory add <分类>|<内容>");
+                    }
+                    break;
+                case "del":
+                case "delete":
+                case "remove":
+                    if (args.length >= 3) {
+                        try {
+                            int index = Integer.parseInt(args[2]);
+                            handleMemoryDelete(player, index);
+                        } catch (NumberFormatException e) {
+                            player.sendMessage(ChatColor.RED + "请输入有效的序号");
+                        }
+                    } else {
+                        player.sendMessage(ChatColor.RED + "用法: /cli memory del <序号>");
+                    }
+                    break;
+                case "edit":
+                case "modify":
+                    if (args.length >= 4) {
+                        try {
+                            int index = Integer.parseInt(args[2]);
+                            String content = String.join(" ", Arrays.copyOfRange(args, 3, args.length));
+                            handleMemoryEdit(player, index, content);
+                        } catch (NumberFormatException e) {
+                            player.sendMessage(ChatColor.RED + "请输入有效的序号");
+                        }
+                    } else {
+                        player.sendMessage(ChatColor.RED + "用法: /cli memory edit <序号> <新内容>");
+                    }
+                    break;
+                case "clear":
+                case "clearall":
+                    handleMemoryClear(player);
+                    break;
+                default:
+                    showMemoryList(player);
+                    break;
+            }
+        }
+    }
+
+    private void showMemoryList(Player player) {
+        java.util.List<InstructionManager.PlayerInstruction> instructions = 
+            plugin.getInstructionManager().getInstructions(player.getUniqueId());
+        
+        player.sendMessage(ChatColor.GOLD + "--- 记忆管理 ---");
+        
+        if (instructions.isEmpty()) {
+            player.sendMessage(ChatColor.GRAY + "暂无记忆记录");
+        } else {
+            for (int i = 0; i < instructions.size(); i++) {
+                InstructionManager.PlayerInstruction inst = instructions.get(i);
+                TextComponent line = new TextComponent(ChatColor.WHITE + "" + (i + 1) + ". ");
+                
+                TextComponent category = new TextComponent(ChatColor.AQUA + "[" + inst.getCategory() + "] ");
+                line.addExtra(category);
+                
+                TextComponent content = new TextComponent(ChatColor.WHITE + inst.getContent());
+                line.addExtra(content);
+                
+                line.addExtra(ChatColor.GRAY + " ");
+                
+                TextComponent editBtn = new TextComponent(ChatColor.YELLOW + "[改]");
+                editBtn.setClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/cli memory edit " + (i + 1) + " " + inst.getContent()));
+                editBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击修改此记忆")));
+                line.addExtra(editBtn);
+                
+                line.addExtra(ChatColor.GRAY + " ");
+                
+                TextComponent delBtn = new TextComponent(ChatColor.RED + "[删]");
+                delBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli memory del " + (i + 1)));
+                delBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击删除此记忆")));
+                line.addExtra(delBtn);
+                
+                player.spigot().sendMessage(line);
+            }
+        }
+        
+        player.sendMessage(ChatColor.GRAY + "");
+        TextComponent addBtn = new TextComponent(ChatColor.GREEN + "[+ 新增记忆]");
+        addBtn.setClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/cli memory add "));
+        addBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击添加新记忆")));
+        player.spigot().sendMessage(addBtn);
+        
+        if (!instructions.isEmpty()) {
+            TextComponent clearBtn = new TextComponent(ChatColor.RED + "[清空全部]");
+            clearBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli memory clear"));
+            clearBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击清空所有记忆")));
+            player.spigot().sendMessage(clearBtn);
+        }
+    }
+
+    private void handleMemoryAdd(Player player, String content) {
+        String category = "general";
+        String memoryContent = content;
+        
+        if (content.contains("|")) {
+            String[] parts = content.split("\\|", 2);
+            if (parts.length == 2) {
+                category = parts[0].trim();
+                memoryContent = parts[1].trim();
+            }
+        }
+        
+        if (memoryContent.isEmpty()) {
+            player.sendMessage(ChatColor.RED + "记忆内容不能为空");
+            return;
+        }
+        
+        String result = plugin.getInstructionManager().addInstruction(player, memoryContent, category);
+        if (result.startsWith("success")) {
+            player.sendMessage(ChatColor.GREEN + "已添加记忆: " + memoryContent);
+        } else {
+            player.sendMessage(ChatColor.RED + result);
+        }
+        showMemoryList(player);
+    }
+
+    private void handleMemoryDelete(Player player, int index) {
+        String result = plugin.getInstructionManager().removeInstruction(player, index);
+        if (result.startsWith("success")) {
+            player.sendMessage(ChatColor.YELLOW + "已删除第 " + index + " 条记忆");
+        } else {
+            player.sendMessage(ChatColor.RED + result);
+        }
+        showMemoryList(player);
+    }
+
+    private void handleMemoryEdit(Player player, int index, String content) {
+        String category = "general";
+        String memoryContent = content;
+        
+        if (content.contains("|")) {
+            String[] parts = content.split("\\|", 2);
+            if (parts.length == 2) {
+                category = parts[0].trim();
+                memoryContent = parts[1].trim();
+            }
+        }
+        
+        if (memoryContent.isEmpty()) {
+            player.sendMessage(ChatColor.RED + "记忆内容不能为空");
+            return;
+        }
+        
+        String result = plugin.getInstructionManager().updateInstruction(player, index, memoryContent, category);
+        if (result.startsWith("success")) {
+            player.sendMessage(ChatColor.GREEN + "已修改第 " + index + " 条记忆");
+        } else {
+            player.sendMessage(ChatColor.RED + result);
+        }
+        showMemoryList(player);
+    }
+
+    private void handleMemoryClear(Player player) {
+        String result = plugin.getInstructionManager().clearInstructions(player);
+        if (result.startsWith("success")) {
+            player.sendMessage(ChatColor.YELLOW + "已清空所有记忆");
+        } else {
+            player.sendMessage(ChatColor.RED + result);
+        }
+        showMemoryList(player);
     }
 
     private void sendToggleMessage(Player player, String tool, String description) {
@@ -372,7 +566,7 @@ public class CLICommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> subCommands = new ArrayList<>(Arrays.asList("reload", "status", "yolo", "normal", "checkupdate", "upgrade", "read", "set", "settings", "display", "toggle", "notice", "retry", "todo"));
+            List<String> subCommands = new ArrayList<>(Arrays.asList("reload", "status", "yolo", "normal", "checkupdate", "upgrade", "read", "set", "settings", "display", "toggle", "notice", "retry", "todo", "memory"));
             return subCommands.stream()
                     .filter(s -> s.startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());
@@ -386,6 +580,10 @@ public class CLICommand implements CommandExecutor, TabCompleter {
                     .collect(Collectors.toList());
         } else if (args.length == 2 && args[0].equalsIgnoreCase("notice")) {
             return Arrays.asList("read").stream()
+                    .filter(s -> s.startsWith(args[1].toLowerCase()))
+                    .collect(Collectors.toList());
+        } else if (args.length == 2 && (args[0].equalsIgnoreCase("memory") || args[0].equalsIgnoreCase("mem"))) {
+            return Arrays.asList("add", "del", "edit", "clear").stream()
                     .filter(s -> s.startsWith(args[1].toLowerCase()))
                     .collect(Collectors.toList());
         }
