@@ -85,6 +85,26 @@ public class InstructionManager {
         return "success: 已删除第 " + index + " 条记忆: " + removed.getContent();
     }
 
+    public String updateInstruction(Player player, int index, String content, String category) {
+        UUID uuid = player.getUniqueId();
+        List<PlayerInstruction> instructions = getInstructions(uuid);
+        
+        if (index < 1 || index > instructions.size()) {
+            return "error: 无效的序号，当前共有 " + instructions.size() + " 条记忆";
+        }
+        
+        if (content == null || content.trim().isEmpty()) {
+            return "error: 记忆内容不能为空";
+        }
+        
+        PlayerInstruction updated = new PlayerInstruction(content.trim(), category);
+        instructions.set(index - 1, updated);
+        saveInstructions(uuid, instructions);
+        
+        plugin.getLogger().info("[Instruction] 玩家 " + player.getName() + " 修改了第 " + index + " 条记忆: " + content);
+        return "success: 已修改第 " + index + " 条记忆为: " + content;
+    }
+
     public String clearInstructions(Player player) {
         UUID uuid = player.getUniqueId();
         cache.remove(uuid);

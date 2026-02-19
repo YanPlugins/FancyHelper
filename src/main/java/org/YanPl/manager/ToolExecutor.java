@@ -92,6 +92,9 @@ public class ToolExecutor {
             case "#forget":
                 handleForgetKeyTool(player, args);
                 break;
+            case "#editmem":
+                handleEditmemTool(player, args);
+                break;
             default:
                 player.sendMessage(ChatColor.RED + "未知工具: " + toolName);
                 cliManager.feedbackToAI(player, "#error: 未知工具 " + toolName + "。请仅使用系统提示中定义的工具。");
@@ -155,7 +158,8 @@ public class ToolExecutor {
             !lowerToolName.equals("#over") && !lowerToolName.equals("#ls") && 
             !lowerToolName.equals("#read") && !lowerToolName.equals("#diff") && 
             !lowerToolName.equals("#exit") && !lowerToolName.equals("#todo") &&
-            !lowerToolName.equals("#remember") && !lowerToolName.equals("#forget")) {
+            !lowerToolName.equals("#remember") && !lowerToolName.equals("#forget") &&
+            !lowerToolName.equals("#editmem")) {
             player.sendMessage(ChatColor.GRAY + "〇 " + toolName);
         } else if (lowerToolName.equals("#diff")) {
             String[] parts = args.split("\\|", 3);
@@ -1038,6 +1042,51 @@ public class ToolExecutor {
             cliManager.feedbackToAI(player, "#forget_result: " + result);
         } catch (NumberFormatException e) {
             cliManager.feedbackToAI(player, "#forget_result: error - 无效的序号: " + arg);
+        }
+    }
+
+    /**
+     * 处理 #editmem 工具 - 修改指定记忆
+     * 格式: #editmem: 序号|新内容 或 #editmem: 序号|分类|新内容
+     */
+    private void handleEditmemTool(Player player, String args) {
+        UUID uuid = player.getUniqueId();
+        cliManager.setGenerating(uuid, false, CLIManager.GenerationStatus.EXECUTING_TOOL);
+
+        if (args == null || args.trim().isEmpty()) {
+            cliManager.feedbackToAI(player, "#editmem_result: error - 需要提供序号和新内容，格式: #editmem: 序号|新内容 或 #editmem: 序号|分类|新内容");
+            return;
+        }
+
+        String[] parts = args.trim().split("\\|", 3);
+        
+        if (parts.length < 2) {
+            cliManager.feedbackToAI(player, "#editmem_result: error - 格式错误，正确格式: #editmem: 序号|新内容 或 #editmem: 序号|分类|新内容");
+            return;
+        }
+
+        try {
+            int index = Integer.parseInt(parts[0].trim());
+            String content;
+            String category;
+
+            if (parts.length == 2) {
+                category = "general";
+                content = parts[1].trim();
+            } else {
+                category = parts[1].trim();
+                content = parts[2].trim();
+            }
+
+            if (content.isEmpty()) {
+                cliManager.feedbackToAI(player, "#editmem_result: error - 记忆内容不能为空");
+                return;
+            }
+
+            String result = plugin.getInstructionManager().updateInstruction(player, index, content, category);
+            cliManager.feedbackToAI(player, "#editmem_result: " + result);
+        } catch (NumberFormatException e) {
+            cliManager.feedbackToAI(player, "#editmem_result: error - 无效的序号: " + parts[0].trim());
         }
     }
 }
