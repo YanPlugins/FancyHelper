@@ -1,0 +1,301 @@
+{
+  "repo_notes": [
+    {
+      "content": ""
+    }
+  ],
+  "pages": [
+    {
+      "title": "概述",
+      "purpose": "介绍 FancyHelper 及其作为 AI 驱动的 Minecraft 服务器管理插件的用途，以及高层架构概览",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "快速入门",
+      "purpose": "引导用户完成安装、初始设置和基础使用",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "安装与需求",
+      "purpose": "详细说明系统要求、依赖项（ProtocolLib）以及安装步骤",
+      "parent": "快速入门",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "配置指南",
+      "purpose": "关于配置 AI 供应商、搜索服务以及插件设置的综合指南",
+      "parent": "快速入门",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "AI 命令行界面 (CLI) 初探",
+      "purpose": "关于进入 CLI 模式、基础命令以及理解 AI 响应的教程",
+      "parent": "快速入门",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "核心系统",
+      "purpose": "深入探讨主要架构组件及其协作方式",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "CLI 管理器与会话管理",
+      "purpose": "详细解释 CLIManager 在处理玩家会话、对话状态、AI 状态和防死循环检测中的作用",
+      "parent": "核心系统",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "AI 集成架构",
+      "purpose": "解释 CloudFlareAI 客户端、多供应商支持、请求/响应处理以及错误恢复机制",
+      "parent": "核心系统",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "提示词工程系统",
+      "purpose": "详细说明 PromptManager 在生成上下文感知的系统提示词、工具定义和约束方面的作用",
+      "parent": "核心系统",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "命令接口与路由",
+      "purpose": "解释 CLICommand 在命令解析、权限检查和交互式 UI 组件中的作用",
+      "parent": "核心系统",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "配置管理",
+      "purpose": "解释 ConfigManager 在加载、迁移以及提供配置和玩家数据访问方面的作用",
+      "parent": "核心系统",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "AI 交互功能",
+      "purpose": "记录面向用户的 AI 交互功能，包括模式、安全机制和工具系统",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "对话模式：普通 vs YOLO",
+      "purpose": "解释普通模式与 YOLO 模式的区别，包括风险命令处理和确认流程",
+      "parent": "AI 交互功能",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "工具执行与安全",
+      "purpose": "详细介绍工具执行流水线、确认机制、防死循环检测和验证系统",
+      "parent": "AI 交互功能",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "反馈循环与 AI 优化",
+      "purpose": "解释如何将命令结果反馈给 AI，以实现持续改进和错误修正",
+      "parent": "AI 交互功能",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "思维过程与调试",
+      "purpose": "解释思维展示系统、会话指标以及用于 AI 交互的调试工具",
+      "parent": "AI 交互功能",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "搜索与增强服务",
+      "purpose": "记录用于网页搜索和文档检索的外部服务集成",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "秘塔 (Metaso) AI 搜索",
+      "purpose": "详细说明秘塔集成、配置以及在搜索层级中的优先级",
+      "parent": "搜索与增强服务",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "文档预设与工作空间索引",
+      "purpose": "解释内置的插件预设（LuckPerms, EssentialsX, WorldEdit）和工作空间索引系统",
+      "parent": "搜索与增强服务",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "插件管理",
+      "purpose": "记录自动更新、通知、验证和 EULA 系统",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "自动更新",
+      "purpose": "解释更新检查、自动升级、GitHub 集成以及版本迁移",
+      "parent": "插件管理",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "公告系统",
+      "purpose": "记录公告抓取、显示以及阅读追踪系统",
+      "parent": "插件管理",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "安全验证",
+      "purpose": "解释针对敏感工具权限（ls, read, diff）的基于文件的验证系统",
+      "parent": "插件管理",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "开发与贡献",
+      "purpose": "为想要了解代码库或做出贡献的开发者提供指南",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "插件架构概览",
+      "purpose": "插件架构、生命周期和组件关系的高层概览",
+      "parent": "开发与贡献",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "构建系统与 CI/CD",
+      "purpose": "记录 Maven 构建配置、GitHub Actions 工作流、测试和发布流程",
+      "parent": "开发与贡献",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "仓库结构",
+      "purpose": "解释代码库组织结构，包括 FancyHelperReloadService 构件",
+      "parent": "开发与贡献",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "参考资料",
+      "purpose": "关于配置选项、命令和权限的完整参考文档",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "配置参考",
+      "purpose": "config.yml 所有选项的完整参考，包含描述、默认值和示例",
+      "parent": "参考资料",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "命令与权限",
+      "purpose": "所有命令、别名和权限节点的完整参考",
+      "parent": "参考资料",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    }
+  ]
+}
