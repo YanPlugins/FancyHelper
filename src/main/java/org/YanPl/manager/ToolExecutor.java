@@ -154,13 +154,9 @@ public class ToolExecutor {
     private void displayToolCall(Player player, String toolName, String args) {
         String lowerToolName = toolName.toLowerCase();
 
-        if (!lowerToolName.equals("#search") && !lowerToolName.equals("#run") && 
-            !lowerToolName.equals("#over") && !lowerToolName.equals("#ls") && 
-            !lowerToolName.equals("#read") && !lowerToolName.equals("#diff") && 
-            !lowerToolName.equals("#exit") && !lowerToolName.equals("#todo") &&
-            !lowerToolName.equals("#remember") && !lowerToolName.equals("#forget") &&
-            !lowerToolName.equals("#editmem")) {
-            player.sendMessage(ChatColor.GRAY + "〇 " + toolName);
+        if (lowerToolName.equals("#remember") || lowerToolName.equals("#forget") ||
+            lowerToolName.equals("#editmem")) {
+            player.sendMessage(ChatColor.WHITE + "⁕ Fancy 正在记住你说的话..");
         } else if (lowerToolName.equals("#diff")) {
             String[] parts = args.split("\\|", 3);
             String path = parts.length > 0 ? parts[0].trim() : "";
@@ -171,6 +167,10 @@ public class ToolExecutor {
             }
         } else if (lowerToolName.equals("#exit")) {
             player.sendMessage(ChatColor.GRAY + "〇 Exiting...");
+        } else if (!lowerToolName.equals("#search") && !lowerToolName.equals("#run") && 
+            !lowerToolName.equals("#over") && !lowerToolName.equals("#ls") && 
+            !lowerToolName.equals("#read") && !lowerToolName.equals("#todo")) {
+            player.sendMessage(ChatColor.GRAY + "〇 " + toolName);
         }
     }
 
@@ -677,10 +677,6 @@ public class ToolExecutor {
         String subtitle = args[1] != null ? args[1].toString() : "";
 
         if (!title.isEmpty() || !subtitle.isEmpty()) {
-            if (output.length() > 0) output.append("\n");
-            output.append("[Title] ").append(ChatColor.stripColor(title));
-            if (!subtitle.isEmpty()) output.append(" [Subtitle] ").append(ChatColor.stripColor(subtitle));
-
             try {
                 player.sendTitle(title, subtitle,
                     args.length > 2 ? (int) args[2] : 10,
