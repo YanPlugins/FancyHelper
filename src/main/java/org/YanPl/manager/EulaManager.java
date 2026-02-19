@@ -80,8 +80,8 @@ public class EulaManager {
             "   或生成违法内容。违规行为的法律责任由用户独自承担。",
             "",
             "7. 【本地数据存储】",
-            "   用户偏好记忆以明文 JSON 格式存储于服务器本地。",
-            "   请勿在记忆中保存敏感信息。开发者不对本地数据",
+            "   对话相关内容以明文存储于服务器本地。",
+            "   请勿在对话中发送敏感信息。开发者不对本地数据",
             "   的泄露或被他人访问承担责任。",
             "",
             "8. 【协议变更与终止】",
@@ -322,7 +322,8 @@ public class EulaManager {
         try {
             Files.write(eulaFile.toPath(), eulaContent, StandardCharsets.UTF_8);
             Files.write(licenseFile.toPath(), licenseContent, StandardCharsets.UTF_8);
-            plugin.getLogger().info("由于版本更新，EULA 和 License 文件已强制更新。");
+            plugin.getLogger().warning("由于版本更新，EULA 和 License 文件已强制更新。");
+            plugin.getLogger().warning("请查看 plugins/FancyHelper/README/ 目录下的 eula.txt 和 license.txt 文件了解最新协议内容。");
             isEulaValid.set(true);
             isLicenseValid.set(true);
         } catch (IOException e) {
