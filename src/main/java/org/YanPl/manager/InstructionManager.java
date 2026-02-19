@@ -146,7 +146,8 @@ public class InstructionManager {
         }
         
         StringBuilder sb = new StringBuilder();
-        sb.append("以下是玩家 ").append(getPlayerName(uuid)).append(" 的偏好和记忆，请在对话中参考这些信息:\n");
+        sb.append("以下是玩家 ").append(getPlayerName(uuid)).append(" 的偏好和记忆，请在对话中参考这些信息。\n");
+        sb.append("注意：如果记忆之间存在冲突，以列表中靠后的（较新的）记忆为准。\n");
         for (PlayerInstruction inst : instructions) {
             sb.append("- [").append(inst.getCategory()).append("] ").append(inst.getContent()).append("\n");
         }
