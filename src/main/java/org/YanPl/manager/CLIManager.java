@@ -498,6 +498,11 @@ public class CLIManager {
      */
     public void exitCLI(Player player) {
         UUID uuid = player.getUniqueId();
+        
+        if (!activeCLIPayers.contains(uuid)) {
+            return;
+        }
+        
         plugin.getLogger().info("[CLI] 玩家 " + player.getName() + " 正在退出 FancyHelper。");
         
         // 退出前自动取消待确认的工具调用

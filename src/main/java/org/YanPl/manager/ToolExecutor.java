@@ -6,6 +6,7 @@ import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.hover.content.Text;
 import org.YanPl.FancyHelper;
 import org.YanPl.model.DialogueSession;
+import org.YanPl.util.ColorUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
@@ -156,7 +157,13 @@ public class ToolExecutor {
 
         if (lowerToolName.equals("#remember") || lowerToolName.equals("#forget") ||
             lowerToolName.equals("#editmem")) {
-            player.sendMessage(ChatColor.WHITE + "⁕ Fancy 正在记住你说的话..");
+            TextComponent message = new TextComponent(ChatColor.WHITE + "⁕ Fancy 正在记住你说的话.. ");
+            TextComponent manageBtn = new TextComponent("[管理记忆]");
+            manageBtn.setColor(net.md_5.bungee.api.ChatColor.of(ColorUtil.getColorZ()));
+            manageBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli memory"));
+            manageBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击管理偏好记忆")));
+            message.addExtra(manageBtn);
+            player.spigot().sendMessage(message);
         } else if (lowerToolName.equals("#diff")) {
             String[] parts = args.split("\\|", 3);
             String path = parts.length > 0 ? parts[0].trim() : "";
