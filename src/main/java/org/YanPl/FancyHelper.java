@@ -14,6 +14,7 @@ import org.YanPl.manager.WorkspaceIndexer;
 import org.YanPl.manager.TodoManager;
 import org.YanPl.manager.NoticeManager;
 import org.YanPl.manager.FileWatcherManager;
+import org.YanPl.manager.InstructionManager;
 import org.YanPl.util.CloudErrorReport;
 import org.YanPl.util.ErrorHandler;
 import org.bstats.bukkit.Metrics;
@@ -44,6 +45,7 @@ public final class FancyHelper extends JavaPlugin {
     private TavilyAPI tavilyAPI;
     private MetasoAPI metasoAPI;
     private ErrorHandler errorHandler;
+    private InstructionManager instructionManager;
 
     @Override
     public void onEnable() {
@@ -87,6 +89,9 @@ public final class FancyHelper extends JavaPlugin {
 
             // 初始化待办管理器
             todoManager = new TodoManager(this);
+
+            // 初始化偏好记忆管理器
+            instructionManager = new InstructionManager(this);
 
             // 初始化 CLI 管理器（管理玩家的 AI 会话）
             cliManager = new CLIManager(this);
@@ -358,6 +363,11 @@ public final class FancyHelper extends JavaPlugin {
             metasoAPI.shutdown();
         }
 
+        // 关闭偏好记忆管理器
+        if (instructionManager != null) {
+            instructionManager.shutdown();
+        }
+
         // 等待短暂时间以确保后台任务结束
         try {
             Thread.sleep(500);
@@ -418,6 +428,10 @@ public final class FancyHelper extends JavaPlugin {
 
     public ErrorHandler getErrorHandler() {
         return errorHandler;
+    }
+
+    public InstructionManager getInstructionManager() {
+        return instructionManager;
     }
 
     /**

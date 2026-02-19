@@ -86,6 +86,15 @@ public class ToolExecutor {
             case "#todo":
                 handleTodoTool(player, args);
                 break;
+            case "#remember":
+                handleRememberTool(player, args);
+                break;
+            case "#forget":
+                handleForgetKeyTool(player, args);
+                break;
+            case "#recall":
+                handleRecallTool(player);
+                break;
             default:
                 player.sendMessage(ChatColor.RED + "未知工具: " + toolName);
                 cliManager.feedbackToAI(player, "#error: 未知工具 " + toolName + "。请仅使用系统提示中定义的工具。");
@@ -148,7 +157,9 @@ public class ToolExecutor {
         if (!lowerToolName.equals("#search") && !lowerToolName.equals("#run") && 
             !lowerToolName.equals("#over") && !lowerToolName.equals("#ls") && 
             !lowerToolName.equals("#read") && !lowerToolName.equals("#diff") && 
-            !lowerToolName.equals("#exit") && !lowerToolName.equals("#todo")) {
+            !lowerToolName.equals("#exit") && !lowerToolName.equals("#todo") &&
+            !lowerToolName.equals("#remember") && !lowerToolName.equals("#forget") && 
+            !lowerToolName.equals("#recall")) {
             player.sendMessage(ChatColor.GRAY + "〇 " + toolName);
         } else if (lowerToolName.equals("#diff")) {
             String[] parts = args.split("\\|", 3);
@@ -969,5 +980,99 @@ public class ToolExecutor {
             String todoDetails = plugin.getTodoManager().getTodoDetails(uuid);
             cliManager.feedbackToAI(player, "#todo_result: " + todoDetails);
         }
+    }
+
+    /**
+     * 处理 #remember 工具 - 记录玩家偏好
+     * 格式: #remember: 内容 或 #remember: 分类|内容
+     */
+    private void handleRememberTool(Player player, String args) {
+        UUID uuid = player.getUniqueId();
+        cliManager.setGenerating(uuid, false, CLIManager.GenerationStatus.EXECUTING_TOOL);
+
+        if (args == null || args.trim().isEmpty()) {
+            player.sendMessage(ChatColor.RED + "⨀ #remember 需要提供要记住的内容");
+            cliManager.feedbackToAI(player, "#remember_result: error - 需要提供要记住的内容，格式: #remember: 内容 或 #remember: 分类|内容");
+            return;
+        }
+
+        String content = args.trim();
+        String category = "general";
+
+        if (content.contains("|")) {
+            String[] parts = content.split("\\|", 2);
+            if (parts.length == 2) {
+                category = parts[0].trim();
+                content = parts[1].trim();
+            }
+        }
+
+        if (content.isEmpty()) {
+            player.sendMessage(ChatColor.RED + "⨀ 记忆内容不能为空");
+            cliManager.feedbackToAI(player, "#remember_result: error - 记忆内容不能为空");
+            return;
+        }
+
+        String result = plugin.getInstructionManager().addInstruction(player, content, category);
+
+        if (result.startsWith("success")) {
+            player.sendMessage(ChatColor.GREEN + "✓ " + result.substring(9));
+            cliManager.feedbackToAI(player, "#remember_result: " + result);
+        } else {
+            player.sendMessage(ChatColor.RED + "⨀ " + result);
+            cliManager.feedbackToAI(player, "#remember_result: " + result);
+        }
+    }
+
+    /**
+     * 处理 #forget 工具 - 删除指定记忆
+     * 格式: #forget: 序号 或 #forget: all (清空所有)
+     */
+    private void handleForgetKeyTool(Player player, String args) {
+        UUID uuid = player.getUniqueId();
+        cliManager.setGenerating(uuid, false, CLIManager.GenerationStatus.EXECUTING_TOOL);
+
+        if (args == null || args.trim().isEmpty()) {
+            player.sendMessage(ChatColor.RED + "⨀ #forget 需要提供序号或 'all'");
+            cliManager.feedbackToAI(player, "#forget_result: error - 需要提供序号或 'all'，格式: #forget: 序号 或 #forget: all");
+            return;
+        }
+
+        String arg = args.trim();
+
+        if (arg.equalsIgnoreCase("all")) {
+            String result = plugin.getInstructionManager().clearInstructions(player);
+            player.sendMessage(ChatColor.YELLOW + "✓ " + result.substring(9));
+            cliManager.feedbackToAI(player, "#forget_result: " + result);
+            return;
+        }
+
+        try {
+            int index = Integer.parseInt(arg);
+            String result = plugin.getInstructionManager().removeInstruction(player, index);
+
+            if (result.startsWith("success")) {
+                player.sendMessage(ChatColor.YELLOW + "✓ " + result.substring(9));
+                cliManager.feedbackToAI(player, "#forget_result: " + result);
+            } else {
+                player.sendMessage(ChatColor.RED + "⨀ " + result);
+                cliManager.feedbackToAI(player, "#forget_result: " + result);
+            }
+        } catch (NumberFormatException e) {
+            player.sendMessage(ChatColor.RED + "⨀ 无效的序号: " + arg);
+            cliManager.feedbackToAI(player, "#forget_result: error - 无效的序号: " + arg);
+        }
+    }
+
+    /**
+     * 处理 #recall 工具 - 查看所有记忆
+     */
+    private void handleRecallTool(Player player) {
+        UUID uuid = player.getUniqueId();
+        cliManager.setGenerating(uuid, false, CLIManager.GenerationStatus.EXECUTING_TOOL);
+
+        String result = plugin.getInstructionManager().listInstructions(player);
+        player.sendMessage(ChatColor.AQUA + "◎ " + result.replace("\n", "\n   "));
+        cliManager.feedbackToAI(player, "#recall_result: " + result);
     }
 }
