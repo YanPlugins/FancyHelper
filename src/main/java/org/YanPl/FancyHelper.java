@@ -14,6 +14,7 @@ import org.YanPl.manager.WorkspaceIndexer;
 import org.YanPl.manager.TodoManager;
 import org.YanPl.manager.NoticeManager;
 import org.YanPl.manager.FileWatcherManager;
+import org.YanPl.manager.InstructionManager;
 import org.YanPl.util.CloudErrorReport;
 import org.YanPl.util.ErrorHandler;
 import org.bstats.bukkit.Metrics;
@@ -44,6 +45,7 @@ public final class FancyHelper extends JavaPlugin {
     private TavilyAPI tavilyAPI;
     private MetasoAPI metasoAPI;
     private ErrorHandler errorHandler;
+    private InstructionManager instructionManager;
 
     @Override
     public void onEnable() {
@@ -87,6 +89,9 @@ public final class FancyHelper extends JavaPlugin {
 
             // 初始化待办管理器
             todoManager = new TodoManager(this);
+
+            // 初始化偏好记忆管理器
+            instructionManager = new InstructionManager(this);
 
             // 初始化 CLI 管理器（管理玩家的 AI 会话）
             cliManager = new CLIManager(this);
@@ -133,7 +138,7 @@ public final class FancyHelper extends JavaPlugin {
             // 使用 ANSI 颜色代码：\u001B[38;5;81m 深青色, \u001B[38;5;208m 橙色, \u001B[36m 青色, \u001B[38;5;155m 灰色, \u001B[0m 重置
             getLogger().info(" \u001B[38;5;81m_\u001B[0m       ");
             getLogger().info("\u001B[38;5;81m|_\u001B[0m   \u001B[38;5;81m|_|\u001B[0m   \u001B[38;5;208mFancyHelper\u001B[0m \u001B[36mv" + getDescription().getVersion() + "\u001B[0m");
-            getLogger().info("\u001B[38;5;81m|\u001B[0m    \u001B[38;5;81m| |\u001B[0m   \u001B[38;5;155mRunning on Bukkit - " + getServer().getName().split("-")[0] + "\u001B[0m");
+            getLogger().info("\u001B[38;5;81m|\u001B[0m    \u001B[38;5;81m| |\u001B[0m   \u001B[38;5;155mRunning on Spigot - " + getServer().getName().split("-")[0] + "\u001B[0m");
             getLogger().info("");
 
             // 尝试同步命令，修复热重载后的 Brigadier 缓存问题
@@ -358,6 +363,11 @@ public final class FancyHelper extends JavaPlugin {
             metasoAPI.shutdown();
         }
 
+        // 关闭偏好记忆管理器
+        if (instructionManager != null) {
+            instructionManager.shutdown();
+        }
+
         // 等待短暂时间以确保后台任务结束
         try {
             Thread.sleep(500);
@@ -418,6 +428,10 @@ public final class FancyHelper extends JavaPlugin {
 
     public ErrorHandler getErrorHandler() {
         return errorHandler;
+    }
+
+    public InstructionManager getInstructionManager() {
+        return instructionManager;
     }
 
     /**

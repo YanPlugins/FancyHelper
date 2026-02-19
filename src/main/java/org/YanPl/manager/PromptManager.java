@@ -79,6 +79,14 @@ public class PromptManager {
             sb.append("In all subsequent conversations, please maintain this scenario.\n\n");
         }
 
+        // ==================== Player Instructions / 玩家偏好 ====================
+        // 【玩家偏好】从玩家记忆中获取偏好信息
+        String instructions = plugin.getInstructionManager().getInstructionsAsPrompt(player.getUniqueId());
+        if (instructions != null && !instructions.isEmpty()) {
+            sb.append("[Player Preferences]\n");
+            sb.append(instructions).append("\n\n");
+        }
+
         // ==================== Core Constraints / 核心约束 ====================
         // 【核心约束】这是系统最重要的约束，违反将导致解析失败，请务必严格遵守：
         // 1. 【单工具调用】每次回复只能包含一个工具调用，禁止调用多个工具
@@ -171,6 +179,29 @@ public class PromptManager {
             sb.append("    Constraint: #diff must be the last part of response. No #over after it.\n");
         }
         sb.append("\n");
+        
+        // 【记忆管理工具】
+        // #remember: <content> - 记住玩家的偏好或指令，下次对话时会自动注入到系统提示中
+        //    格式：#remember: 内容 或 #remember: 分类|内容
+        //    分类示例：language（语言偏好）、style（对话风格）、command（常用命令模板）
+        //    例如：#remember: language|回复时使用英文
+        //    限制：每个玩家最多存储 50 条记忆
+        //    **重要**：记忆必须简洁明了，每条不超过50字，提炼关键信息
+        //    正确：#remember: style|用简洁的中文回复
+        //    错误：#remember: style|我希望你在回复我的时候能够使用简洁明了的中文，不要太啰嗦
+        // #forget: <index|all> - 删除指定序号的记忆或清空所有记忆
+        //    例如：#forget: 1 删除第一条记忆，#forget: all 清空所有
+        sb.append("[Memory Tools]\n");
+        sb.append("  #remember: <content> - Remember player preferences or instructions for future conversations.\n");
+        sb.append("    Format: #remember: content OR #remember: category|content\n");
+        sb.append("    Categories: language (language preference), style (conversation style), command (common command templates)\n");
+        sb.append("    Example: #remember: language|Reply in English\n");
+        sb.append("    Limit: Max 50 memories per player.\n");
+        sb.append("    **IMPORTANT**: Keep memories concise. Each memory MUST NOT exceed 50 characters. Extract key information only.\n");
+        sb.append("    Correct: #remember: style|Reply in concise Chinese\n");
+        sb.append("    Wrong: #remember: style|I want you to use concise and clear Chinese when replying to me, don't be too verbose\n");
+        sb.append("  #forget: <index|all> - Delete a specific memory by index or clear all memories.\n");
+        sb.append("    Example: #forget: 1 (delete first memory), #forget: all (clear all)\n\n");
         
         // 【任务管理工具】
         // #todo: <json> - 创建或更新 任务列表
