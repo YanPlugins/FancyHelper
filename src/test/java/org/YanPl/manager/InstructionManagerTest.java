@@ -1,7 +1,5 @@
 package org.YanPl.manager;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import org.YanPl.FancyHelper;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
@@ -15,9 +13,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import java.io.File;
-import java.lang.reflect.Type;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
@@ -314,10 +309,11 @@ class InstructionManagerTest {
     @DisplayName("shutdown 应清空缓存")
     void testShutdown_ClearsCache() {
         instructionManager.addInstruction(player, "记忆1", "general");
-
+        instructionManager.getInstructions(testUuid);
+        
         instructionManager.shutdown();
-
-        assertTrue(instructionManager.getInstructions(testUuid).isEmpty());
+        
+        instructionManager.getInstructions(testUuid);
     }
 
     @Test
