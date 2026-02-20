@@ -108,6 +108,41 @@ class TodoItemTest {
     }
 
     @Test
+    @DisplayName("Status.fromString 对空字符串应该返回 PENDING")
+    void testStatusFromStringEmpty() {
+        assertEquals(TodoItem.Status.PENDING, TodoItem.Status.fromString(""));
+    }
+
+    @Test
+    @DisplayName("getFullDisplayText 描述为 null 时")
+    void testGetFullDisplayTextNullDescription() {
+        todoItem.setTask("任务名称");
+        todoItem.setDescription(null);
+        
+        String result = todoItem.getFullDisplayText();
+        assertTrue(result.contains("任务名称"));
+        assertFalse(result.contains("\n  "));
+    }
+
+    @Test
+    @DisplayName("getFullDisplayText 描述为空字符串时")
+    void testGetFullDisplayTextEmptyDescription() {
+        todoItem.setTask("任务名称");
+        todoItem.setDescription("");
+        
+        String result = todoItem.getFullDisplayText();
+        assertTrue(result.contains("任务名称"));
+        assertFalse(result.contains("\n  "));
+    }
+
+    @Test
+    @DisplayName("setStatus 使用 null 字符串")
+    void testSetStatusWithNullString() {
+        todoItem.setStatus((String) null);
+        assertEquals(TodoItem.Status.PENDING, todoItem.getStatus());
+    }
+
+    @Test
     @DisplayName("字符串 setter 应该正确解析状态")
     void testSetStatusWithString() {
         todoItem.setStatus("completed");
