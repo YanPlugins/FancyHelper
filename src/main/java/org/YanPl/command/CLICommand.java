@@ -110,6 +110,7 @@ public class CLICommand implements CommandExecutor, TabCompleter {
             case "exempt_anti_loop":
             case "todo":
             case "retry":
+            case "stop":
             case "memory":
             case "mem":
                 if (!(sender instanceof Player)) {
@@ -224,6 +225,9 @@ public class CLICommand implements CommandExecutor, TabCompleter {
                 return true;
             case "retry":
                 plugin.getCliManager().handleRetry(player);
+                return true;
+            case "stop":
+                plugin.getCliManager().handleChat(player, "stop");
                 return true;
             case "todo":
                 plugin.getCliManager().openTodoBook(player);

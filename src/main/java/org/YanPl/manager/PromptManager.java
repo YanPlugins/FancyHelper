@@ -213,6 +213,7 @@ public class PromptManager {
         sb.append("    Format: #editmem: index|content OR #editmem: index|category|content\n");
         sb.append("    Example: #editmem: 1|Reply in English\n\n");
         
+        
         // 【任务管理工具】
         // #todo: <json> - 创建或更新 任务列表
         //    JSON 数组格式，包含任务对象
@@ -242,24 +243,38 @@ public class PromptManager {
         
         // ==================== Usage Guide / 使用指南 ====================
         // 【使用指南】
-        // 1. **优先查看预设**：处理任务前必须先调用 #getpreset 查看相关预设文件
-        //    - 不读预设就执行命令极大概率会出错，不同插件的命令格式差异巨大
-        //    - 例如：玩家询问 LuckPerms 权限时，必须先调用 #getpreset: luckperms.txt
-        // 2. **处理复杂任务**：当需要 3 步及以上才能完成的任务时，使用 #todo 创建任务列表，让用户了解进度
-        // 3. **使用原则**：
+        // 1. **先检查预设是否存在**：调用 #getpreset 前必须先检查 Available Presets 列表中是否存在该预设
+        //    - 如果预设存在：调用 #getpreset: <plugin_name>.txt 读取预设
+        //    - 如果预设不存在：必须使用 #search 搜索文档，禁止猜测命令
+        //    - 例如：玩家询问 LuckPerms → 检查列表 → 'luckperms.txt' 存在 → 调用 #getpreset: luckperms.txt
+        //    - 例如：玩家询问 SomeUnknownPlugin → 检查列表 → 未找到 → 调用 #search: SomeUnknownPlugin command usage
+        // 2. **禁止猜测命令**：如果预设不存在且未搜索过，禁止执行命令，必须先搜索
+        // 3. **备用策略**：如果搜索无果，尝试不带参数或带 'help' 参数运行命令来发现用法
+        //    - 例如：#run: pluginname → 可能显示命令列表
+        //    - 例如：#run: pluginname help → 可能显示帮助文档
+        // 4. **处理复杂任务**：当需要 3 步及以上才能完成的任务时，使用 #todo 创建任务列表，让用户了解进度
+        // 5. **使用原则**：
         //    - 应该使用：复杂多步骤任务、需要规划的任务、需要显示进度的任务
         //    - 不应该使用：2 步内的简单任务、单次响应可回答的问题、紧凑循环任务
         //    - 收到复杂任务后立即创建待办列表，及时更新任务状态
         //    - 重要：调用 #todo 后必须立即结束回复，禁止在同一回复中调用其他工具
         sb.append("[Usage Guide]\n");
-        sb.append("1. **Read Presets First**: You MUST call #getpreset to read relevant preset files before handling tasks.\n");
-        sb.append("   - Executing commands without reading presets has a high probability of errors. Different plugins have vastly different command formats.\n");
-        sb.append("   - Example: When a player asks about LuckPerms permissions, you must call #getpreset: luckperms.txt first.\n");
-        sb.append("   - Available presets: ").append(String.join(", ", plugin.getWorkspaceIndexer().getIndexedPresets())).append("\n\n");
+        sb.append("1. **Check Preset Availability First**: BEFORE calling #getpreset, you MUST check if the preset exists in the Available Presets list below.\n");
+        sb.append("   - Available presets: ").append(String.join(", ", plugin.getWorkspaceIndexer().getIndexedPresets())).append("\n");
+        sb.append("   - If preset exists: Call #getpreset: <plugin_name>.txt to read the preset.\n");
+        sb.append("   - If preset does NOT exist: You MUST use #search to search for documentation. DO NOT guess commands.\n");
+        sb.append("   - Example: Player asks about LuckPerms → Check list → 'luckperms.txt' exists → Call #getpreset: luckperms.txt\n");
+        sb.append("   - Example: Player asks about SomeUnknownPlugin → Check list → Not found → Call #search: SomeUnknownPlugin command usage\n\n");
         
-        sb.append("2. **Handling Complex Tasks**: When a task requires 3 or more steps, use #todo to create a task list so users can track progress.\n\n");
+        sb.append("2. **Never Guess Commands**: If no preset exists and you haven't searched, you MUST NOT execute commands. Always search first.\n\n");
         
-        sb.append("3. **TODO Usage Principles**:\n");
+        sb.append("3. **Fallback Strategy**: If search returns no useful results, try running the command without arguments or with 'help' as argument to discover usage.\n");
+        sb.append("   - Example: #run: pluginname → May show command list\n");
+        sb.append("   - Example: #run: pluginname help → May show help documentation\n\n");
+        
+        sb.append("4. **Handling Complex Tasks**: When a task requires 3 or more steps, use #todo to create a task list so users can track progress.\n\n");
+        
+        sb.append("5. **TODO Usage Principles**:\n");
         sb.append("   - Should use: Complex multi-step tasks, tasks needing planning, tasks needing progress display\n");
         sb.append("   - Should NOT use: Simple tasks under 2 steps, questions answerable in single response, tight loop tasks\n");
         sb.append("   - Create TODO list immediately after receiving complex task, update task status timely\n");

@@ -865,9 +865,10 @@ public class CLIManager {
         generationStates.put(uuid, GenerationStatus.THINKING);
         generationStartTimes.put(uuid, System.currentTimeMillis());
 
-        player.sendMessage(ChatColor.GRAY + "◇ " + message);
-        // 不再主动发送 Thought...，避免干扰用户
-        // player.sendMessage(ChatColor.GRAY + "◆ Thought...");
+        TextComponent playerMsg = new TextComponent(ChatColor.GRAY + "◇ " + message);
+        playerMsg.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli stop"));
+        playerMsg.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text("点击打断")));
+        player.spigot().sendMessage(playerMsg);
 
         String modelName = plugin.getConfigManager().getCloudflareModel();
         plugin.getLogger().info("[CLI] 会话 " + player.getName() + " - 历史记录大小: " + session.getHistory().size() + ", 预计 Token: " + session.getEstimatedTokens(modelName));

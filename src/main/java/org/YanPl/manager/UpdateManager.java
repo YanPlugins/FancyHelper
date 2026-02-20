@@ -145,7 +145,11 @@ public class UpdateManager implements Listener {
                                     }
                                 }
                             }
-                            sender.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f使用 " + ChatColor.AQUA + "/fancy upgrade" + ChatColor.YELLOW + " 自动下载并更新。"));
+                            if (plugin.getConfigManager().isAutoUpgrade()) {
+                                sender.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f正在执行自动更新..."));
+                            } else {
+                                sender.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f使用 " + ChatColor.AQUA + "/fancy upgrade" + ChatColor.WHITE + " 自动下载并更新。"));
+                            }
                         }
                     } else {
                         hasUpdate = false;
