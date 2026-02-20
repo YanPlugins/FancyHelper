@@ -213,6 +213,7 @@ public class PromptManager {
         sb.append("    Format: #editmem: index|content OR #editmem: index|category|content\n");
         sb.append("    Example: #editmem: 1|Reply in English\n\n");
         
+        
         // 【任务管理工具】
         // #todo: <json> - 创建或更新 任务列表
         //    JSON 数组格式，包含任务对象
