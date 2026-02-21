@@ -217,11 +217,11 @@ public class TavilyAPI {
     private String extractErrorMessage(String responseBody) {
         try {
             JsonObject json = JsonParser.parseString(responseBody).getAsJsonObject();
-            if (json.has("error")) {
+            if (json.has("error") && !json.get("error").isJsonNull()) {
                 return json.get("error").getAsString();
-            } else if (json.has("message")) {
+            } else if (json.has("message") && !json.get("message").isJsonNull()) {
                 return json.get("message").getAsString();
-            } else if (json.has("detail")) {
+            } else if (json.has("detail") && !json.get("detail").isJsonNull()) {
                 return json.get("detail").getAsString();
             }
         } catch (Exception ignored) {

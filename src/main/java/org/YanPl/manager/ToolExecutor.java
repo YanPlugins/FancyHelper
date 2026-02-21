@@ -864,14 +864,26 @@ public class ToolExecutor {
 
             if (response.statusCode() == 200) {
                 com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(response.body()).getAsJsonObject();
-                com.google.gson.JsonArray searchResults = json.getAsJsonObject("query").getAsJsonArray("search");
+                
+                if (!json.has("query") || json.get("query").isJsonNull()) {
+                    return "未找到相关 Wiki 条目。";
+                }
+                
+                com.google.gson.JsonObject queryObj = json.getAsJsonObject("query");
+                if (!queryObj.has("search") || queryObj.get("search").isJsonNull()) {
+                    return "未找到相关 Wiki 条目。";
+                }
+                
+                com.google.gson.JsonArray searchResults = queryObj.getAsJsonArray("search");
 
                 if (searchResults.size() > 0) {
                     StringBuilder sb = new StringBuilder("Minecraft Wiki 搜索结果：\n");
                     for (int i = 0; i < Math.min(3, searchResults.size()); i++) {
                         com.google.gson.JsonObject item = searchResults.get(i).getAsJsonObject();
-                        String title = item.get("title").getAsString();
-                        String snippet = item.get("snippet").getAsString().replaceAll("<[^>]*>", "");
+                        
+                        String title = getStringField(item, "title");
+                        String snippet = getStringField(item, "snippet").replaceAll("<[^>]*>", "");
+                        
                         sb.append("- ").append(title).append(": ").append(snippet).append("\n");
                     }
                     return sb.toString();

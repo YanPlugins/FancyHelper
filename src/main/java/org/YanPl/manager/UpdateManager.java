@@ -76,6 +76,10 @@ public class UpdateManager implements Listener {
                     String jsonResponse = response.body();
                     JsonObject jsonObject = JsonParser.parseString(jsonResponse).getAsJsonObject();
 
+                    if (!jsonObject.has("tag_name") || jsonObject.get("tag_name").isJsonNull()) {
+                        plugin.getLogger().warning("检查更新失败：响应中缺少 tag_name 字段");
+                        return;
+                    }
                     latestVersion = jsonObject.get("tag_name").getAsString().replace("v", "");
 
                     // 获取 Release Overview (body 字段的前半部分，AI 生成的内容)
@@ -86,6 +90,10 @@ public class UpdateManager implements Listener {
                     }
 
                     // 获取第一个 .jar 文件的下载地址和文件名
+                    if (!jsonObject.has("assets") || jsonObject.get("assets").isJsonNull()) {
+                        plugin.getLogger().warning("检查更新失败：响应中缺少 assets 字段");
+                        return;
+                    }
                     JsonArray assets = jsonObject.getAsJsonArray("assets");
                     for (JsonElement assetElement : assets) {
                         JsonObject asset = assetElement.getAsJsonObject();
@@ -98,8 +106,13 @@ public class UpdateManager implements Listener {
                     }
 
                     if (downloadUrl == null) {
-                        downloadUrl = jsonObject.get("html_url").getAsString();
-                        latestFileName = "FancyHelper-v" + latestVersion + ".jar";
+                        if (jsonObject.has("html_url") && !jsonObject.get("html_url").isJsonNull()) {
+                            downloadUrl = jsonObject.get("html_url").getAsString();
+                            latestFileName = "FancyHelper-v" + latestVersion + ".jar";
+                        } else {
+                            plugin.getLogger().warning("检查更新失败：无法获取下载链接");
+                            return;
+                        }
                     }
 
                     String currentVersion = plugin.getDescription().getVersion();

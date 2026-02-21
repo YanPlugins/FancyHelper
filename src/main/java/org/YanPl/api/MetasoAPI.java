@@ -217,7 +217,7 @@ public class MetasoAPI {
                 
                 return result.toString();
                 
-            } else if (json.has("error")) {
+            } else if (json.has("error") && !json.get("error").isJsonNull()) {
                 // 错误响应
                 String error = json.get("error").getAsString();
                 return "Metaso 搜索错误: " + error;
@@ -249,18 +249,18 @@ public class MetasoAPI {
     private String extractErrorMessage(String responseBody) {
         try {
             JsonObject json = JsonParser.parseString(responseBody).getAsJsonObject();
-            if (json.has("error")) {
+            if (json.has("error") && !json.get("error").isJsonNull()) {
                 if (json.get("error").isJsonObject()) {
                     JsonObject errorObj = json.getAsJsonObject("error");
-                    if (errorObj.has("message")) {
+                    if (errorObj.has("message") && !errorObj.get("message").isJsonNull()) {
                         return errorObj.get("message").getAsString();
                     }
                     return errorObj.toString();
                 }
                 return json.get("error").getAsString();
-            } else if (json.has("message")) {
+            } else if (json.has("message") && !json.get("message").isJsonNull()) {
                 return json.get("message").getAsString();
-            } else if (json.has("detail")) {
+            } else if (json.has("detail") && !json.get("detail").isJsonNull()) {
                 return json.get("detail").getAsString();
             }
         } catch (Exception ignored) {
