@@ -21,7 +21,7 @@ import java.util.UUID;
 public class GuiManager implements Listener {
 
     private final FancyHelper plugin;
-    private final String SETTINGS_TITLE = ChatColor.DARK_GRAY + "FancyHelper Settings";
+    private final String SETTINGS_TITLE = ColorUtil.translateCustomColors("&zFancyHelper &8| &7Settings");
 
     public GuiManager(FancyHelper plugin) {
         this.plugin = plugin;
@@ -33,37 +33,42 @@ public class GuiManager implements Listener {
     public void openSettingsMenu(Player player) {
         Inventory inv = Bukkit.createInventory(null, 27, SETTINGS_TITLE);
 
+        // 填充背景板
+        ItemStack bg = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
+        for (int i = 0; i < 27; i++) {
+            inv.setItem(i, bg);
+        }
+
         // 1. 模式切换 (Normal/YOLO)
         updateModeItem(inv, player);
 
-        // 2. 状态显示位置 (ActionBar/Subtitle)
-        updateDisplayPosItem(inv, player);
+        // 2. 记忆管理
+        ItemStack memoryItem = createItem(Material.KNOWLEDGE_BOOK, ColorUtil.translateCustomColors("&b&l记忆管理"), 
+                ColorUtil.translateCustomColors("&8&m------------------------"),
+                ColorUtil.translateCustomColors("&7查看和管理 AI 的长期记忆"),
+                "",
+                ColorUtil.translateCustomColors("&e▸ 左键点击: &f查看列表"),
+                ColorUtil.translateCustomColors("&c▸ 右键点击: &f清空记忆"),
+                ColorUtil.translateCustomColors("&8&m------------------------"));
+        inv.setItem(12, memoryItem); 
 
         // 3. 工具权限管理
-        ItemStack toolsItem = createItem(Material.CHEST, ChatColor.GOLD + "工具权限管理", 
-                ChatColor.GRAY + "点击管理文件操作权限",
-                ChatColor.GRAY + "包括: ls, read, diff");
-        inv.setItem(14, toolsItem); // Slot 14 (Row 2, Col 6)
+        ItemStack toolsItem = createItem(Material.CHEST, ColorUtil.translateCustomColors("&6&l工具权限"), 
+                ColorUtil.translateCustomColors("&8&m------------------------"),
+                ColorUtil.translateCustomColors("&7管理文件操作相关权限"),
+                ColorUtil.translateCustomColors("&7包括: &fls, read, diff"),
+                "",
+                ColorUtil.translateCustomColors("&e▸ 点击管理"),
+                ColorUtil.translateCustomColors("&8&m------------------------"));
+        inv.setItem(14, toolsItem); 
 
-        // 4. 记忆管理
-        ItemStack memoryItem = createItem(Material.BOOK, ChatColor.AQUA + "记忆管理", 
-                ChatColor.GRAY + "查看和管理 AI 的记忆",
-                ChatColor.GRAY + "左键: 查看列表",
-                ChatColor.GRAY + "右键: 清空记忆 (需确认)");
-        inv.setItem(12, memoryItem); // Slot 12 (Row 2, Col 4)
+        // 4. 状态显示位置 (ActionBar/Subtitle)
+        updateDisplayPosItem(inv, player);
         
         // 5. 关闭按钮
-        ItemStack closeItem = createItem(Material.BARRIER, ChatColor.RED + "关闭菜单", 
-                ChatColor.GRAY + "点击关闭");
+        ItemStack closeItem = createItem(Material.BARRIER, ColorUtil.translateCustomColors("&c&l关闭菜单"), 
+                ColorUtil.translateCustomColors("&7点击关闭此菜单"));
         inv.setItem(26, closeItem);
-
-        // 填充背景板 (可选)
-        ItemStack bg = createItem(Material.GRAY_STAINED_GLASS_PANE, " ");
-        for (int i = 0; i < 27; i++) {
-            if (inv.getItem(i) == null) {
-                inv.setItem(i, bg);
-            }
-        }
 
         player.openInventory(inv);
     }
@@ -75,30 +80,46 @@ public class GuiManager implements Listener {
 
         ItemStack item;
         if (mode == DialogueSession.Mode.NORMAL) {
-            item = createItem(Material.LIME_DYE, ChatColor.GREEN + "当前模式: Normal", 
-                    ChatColor.GRAY + "点击切换至 YOLO 模式",
-                    ChatColor.GRAY + "YOLO 模式下 AI 将自动执行大部分命令");
+            item = createItem(Material.LIME_DYE, ColorUtil.translateCustomColors("&a&l当前模式: Normal"), 
+                    ColorUtil.translateCustomColors("&8&m------------------------"),
+                    ColorUtil.translateCustomColors("&7当前为 &a普通模式"),
+                    ColorUtil.translateCustomColors("&7AI 执行敏感操作需手动确认"),
+                    "",
+                    ColorUtil.translateCustomColors("&e▸ 点击切换至 YOLO 模式"),
+                    ColorUtil.translateCustomColors("&8&m------------------------"));
         } else {
-            item = createItem(Material.RED_DYE, ChatColor.RED + "当前模式: YOLO", 
-                    ChatColor.GRAY + "点击切换至 Normal 模式",
-                    ChatColor.GRAY + "Normal 模式下 AI 执行命令需手动确认");
+            item = createItem(Material.RED_DYE, ColorUtil.translateCustomColors("&c&l当前模式: YOLO"), 
+                    ColorUtil.translateCustomColors("&8&m------------------------"),
+                    ColorUtil.translateCustomColors("&7当前为 &c激进模式"),
+                    ColorUtil.translateCustomColors("&7AI 将自动执行大部分命令"),
+                    "",
+                    ColorUtil.translateCustomColors("&e▸ 点击切换至 Normal 模式"),
+                    ColorUtil.translateCustomColors("&8&m------------------------"));
         }
-        inv.setItem(10, item); // Slot 10 (Row 2, Col 2)
+        inv.setItem(10, item); 
     }
 
     private void updateDisplayPosItem(Inventory inv, Player player) {
         String displayPos = plugin.getConfigManager().getPlayerDisplayPosition(player);
         ItemStack item;
-        if ("actionbar".equalsIgnoreCase(displayPos)) {
-            item = createItem(Material.COMPASS, ChatColor.YELLOW + "显示位置: ActionBar", 
-                    ChatColor.GRAY + "点击切换至 Subtitle",
-                    ChatColor.GRAY + "当前状态显示在快捷栏上方");
+        boolean isActionBar = "actionbar".equalsIgnoreCase(displayPos);
+        
+        if (isActionBar) {
+            item = createItem(Material.NAME_TAG, ColorUtil.translateCustomColors("&e&l显示位置: ActionBar"), 
+                    ColorUtil.translateCustomColors("&8&m------------------------"),
+                    ColorUtil.translateCustomColors("&7当前显示在: &f快捷栏上方"),
+                    "",
+                    ColorUtil.translateCustomColors("&e▸ 点击切换至 Subtitle"),
+                    ColorUtil.translateCustomColors("&8&m------------------------"));
         } else {
-            item = createItem(Material.PAPER, ChatColor.YELLOW + "显示位置: Subtitle", 
-                    ChatColor.GRAY + "点击切换至 ActionBar",
-                    ChatColor.GRAY + "当前状态显示在屏幕中央");
+            item = createItem(Material.PAPER, ColorUtil.translateCustomColors("&e&l显示位置: Subtitle"), 
+                    ColorUtil.translateCustomColors("&8&m------------------------"),
+                    ColorUtil.translateCustomColors("&7当前显示在: &f屏幕中央"),
+                    "",
+                    ColorUtil.translateCustomColors("&e▸ 点击切换至 ActionBar"),
+                    ColorUtil.translateCustomColors("&8&m------------------------"));
         }
-        inv.setItem(16, item); // Slot 16 (Row 2, Col 8)
+        inv.setItem(16, item);
     }
 
     private ItemStack createItem(Material material, String name, String... lore) {
