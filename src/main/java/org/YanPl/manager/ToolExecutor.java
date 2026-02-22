@@ -47,7 +47,9 @@ public class ToolExecutor {
         String toolName = parseResult.toolName;
         String args = parseResult.args;
 
-        plugin.getLogger().info("[CLI] 正在为 " + player.getName() + " 执行工具: " + toolName + " (参数: " + args + ")");
+        if (plugin.getConfigManager().isDebug()) {
+            plugin.getLogger().info("[CLI] 正在为 " + player.getName() + " 执行工具: " + toolName + " (参数: " + args + ")");
+        }
 
         // 显示工具调用信息
         displayToolCall(player, toolName, args);
