@@ -192,4 +192,16 @@ public class PacketCaptureManager {
     public boolean isCapturing(Player player) {
         return captureBuffers.containsKey(player.getUniqueId());
     }
+
+    /**
+     * 获取当前捕获的内容（不清除）
+     * 
+     * @param player 目标玩家
+     * @return 当前捕获的内容，如果未开始捕获则返回空字符串
+     */
+    public String peekCapture(Player player) {
+        if (!enabled) return "";
+        StringBuilder sb = captureBuffers.get(player.getUniqueId());
+        return sb != null ? sb.toString() : "";
+    }
 }

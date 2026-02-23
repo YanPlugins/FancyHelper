@@ -532,13 +532,40 @@ public class ToolExecutor {
             if (!plugin.isEnabled()) return;
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 String packetOutput = "";
+                String currentProxyOutput = output.toString();
+                
+                // 1. 检查是否有初步输出
+                boolean hasOutput = false;
                 if (plugin.getPacketCaptureManager() != null) {
-                    packetOutput = plugin.getPacketCaptureManager().stopCapture(player);
+                    String peek = plugin.getPacketCaptureManager().peekCapture(player);
+                    if (peek != null && !peek.isEmpty()) hasOutput = true;
+                }
+                if (!currentProxyOutput.isEmpty()) hasOutput = true;
+
+                // 2. 如果有输出，直接结束并返回
+                if (hasOutput) {
+                    if (plugin.getPacketCaptureManager() != null) {
+                        packetOutput = plugin.getPacketCaptureManager().stopCapture(player);
+                    }
+                    String finalResult = buildCommandResult(command, packetOutput, currentProxyOutput, finalSuccess);
+                    player.sendMessage(ChatColor.GRAY + "⇒ 反馈已发送至 Fancy");
+                    cliManager.feedbackToAI(player, "#run_result: " + finalResult);
+                    return;
                 }
 
-                String finalResult = buildCommandResult(command, packetOutput, output.toString(), finalSuccess);
-                player.sendMessage(ChatColor.GRAY + "⇒ 反馈已发送至 Fancy");
-                cliManager.feedbackToAI(player, "#run_result: " + finalResult);
+                // 3. 如果没有输出，继续等待 5 秒 (100 ticks)
+                player.sendMessage(ChatColor.GRAY + "⇒ 暂无反馈，延长等待 5秒...");
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    String delayedPacketOutput = "";
+                    if (plugin.getPacketCaptureManager() != null) {
+                        delayedPacketOutput = plugin.getPacketCaptureManager().stopCapture(player);
+                    }
+                    
+                    String finalResult = buildCommandResult(command, delayedPacketOutput, output.toString(), finalSuccess);
+                    player.sendMessage(ChatColor.GRAY + "⇒ 反馈已发送至 Fancy");
+                    cliManager.feedbackToAI(player, "#run_result: " + finalResult);
+                }, 100L);
+
             }, 20L);
         });
     }
