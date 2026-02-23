@@ -68,6 +68,11 @@ public class GUIListener implements Listener {
 
         GUI closedGUI = (GUI) inventory.getHolder();
 
+        // 检查是否应该忽略此次关闭事件
+        if (closedGUI.checkAndClearIgnoreClose()) {
+            return;
+        }
+
         // 只处理栈顶GUI的关闭事件
         // 如果关闭的不是栈顶GUI，说明是在打开新GUI时触发的关闭事件，忽略它
         GUI currentGUI = guiManager.getCurrentGUI(player);

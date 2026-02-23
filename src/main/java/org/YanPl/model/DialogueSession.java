@@ -51,6 +51,9 @@ public class DialogueSession {
     private List<Question> planQuestions = new ArrayList<>();
     private int currentQuestionIndex = 0;
     private ExecutionPlan currentPlan = null;
+    
+    // 待发送的计划内容（保存计划后，下次发送消息时附带）
+    private String pendingPlanMessage = null;
 
     /**
      * 编码注册表（单例）
@@ -405,6 +408,28 @@ public class DialogueSession {
 
     public void setCurrentPlan(ExecutionPlan plan) {
         this.currentPlan = plan;
+    }
+
+    /**
+     * 获取待发送的计划消息
+     */
+    public String getPendingPlanMessage() {
+        return pendingPlanMessage;
+    }
+
+    /**
+     * 设置待发送的计划消息
+     * 设置后，下次发送消息给AI时会附带此内容
+     */
+    public void setPendingPlanMessage(String message) {
+        this.pendingPlanMessage = message;
+    }
+
+    /**
+     * 清除待发送的计划消息
+     */
+    public void clearPendingPlanMessage() {
+        this.pendingPlanMessage = null;
     }
 
     public static class Message {

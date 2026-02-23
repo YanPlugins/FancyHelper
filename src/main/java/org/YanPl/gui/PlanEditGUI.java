@@ -300,9 +300,11 @@ public class PlanEditGUI extends GUI {
             meta.setDisplayName(ChatColor.YELLOW + "步骤 " + step.getOrder());
 
             List<String> lore = new ArrayList<>();
-            lore.add(ChatColor.GRAY + "描述: " + ChatColor.WHITE + step.getDescription());
+            // 描述可能多行
+            addMultiLineLore(lore, ChatColor.GRAY + "描述: " + ChatColor.WHITE, step.getDescription());
+            // 备注可能多行
             if (step.getNotes() != null && !step.getNotes().isEmpty()) {
-                lore.add(ChatColor.GRAY + "备注: " + ChatColor.WHITE + step.getNotes());
+                addMultiLineLore(lore, ChatColor.GRAY + "备注: " + ChatColor.WHITE, step.getNotes());
             }
             lore.add("");
             lore.add(ChatColor.GREEN + "点击编辑此步骤");
@@ -311,6 +313,28 @@ public class PlanEditGUI extends GUI {
         }
 
         return item;
+    }
+
+    /**
+     * 添加多行内容到lore
+     * @param lore lore列表
+     * @param prefix 第一行的前缀
+     * @param text 文本内容（可能包含换行符）
+     */
+    private void addMultiLineLore(List<String> lore, String prefix, String text) {
+        if (text == null || text.isEmpty()) {
+            lore.add(prefix + "(无)");
+            return;
+        }
+
+        String[] lines = text.split("\n");
+        for (int i = 0; i < lines.length; i++) {
+            if (i == 0) {
+                lore.add(prefix + lines[i]);
+            } else {
+                lore.add(ChatColor.WHITE + "    " + lines[i]);
+            }
+        }
     }
 
     /**
@@ -399,12 +423,44 @@ public class PlanEditGUI extends GUI {
         originalPlan.copyFrom(temporaryPlan);
         originalPlan.setModified(true);
 
+        // 生成计划摘要并设置为待发送消息
+        String planSummary = buildPlanSummary();
+        org.YanPl.manager.CLIManager cliManager = plugin.getCliManager();
+        org.YanPl.model.DialogueSession session = cliManager.getSession(player.getUniqueId());
+        if (session != null) {
+            session.setPendingPlanMessage(planSummary);
+        }
+
         // 清理editGUIMap
         plugin.getPlanManager().clearEditGUI(player.getUniqueId());
 
         // 关闭GUI
         plugin.getGuiManager().closeGUI(player);
 
-        player.sendMessage(ChatColor.GREEN + "» " + ChatColor.WHITE + "计划已保存");
+        player.sendMessage(ChatColor.GREEN + "» " + ChatColor.WHITE + "计划已保存，下次发送消息时将附带计划内容");
+    }
+
+    /**
+     * 构建计划摘要，用于发送给AI
+     */
+    private String buildPlanSummary() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("#saved_plan: 用户已修改计划，内容如下：\n\n");
+        sb.append("计划标题: ").append(originalPlan.getTitle()).append("\n");
+        sb.append("计划描述: ").append(originalPlan.getDescription()).append("\n\n");
+        sb.append("执行步骤:\n");
+
+        for (int i = 0; i < originalPlan.getSteps().size(); i++) {
+            PlanStep step = originalPlan.getSteps().get(i);
+            sb.append("  ").append(i + 1).append(". ").append(step.getDescription());
+            if (step.getNotes() != null && !step.getNotes().isEmpty()) {
+                sb.append(" (备注: ").append(step.getNotes()).append(")");
+            }
+            sb.append("\n");
+        }
+
+        sb.append("\n用户可以继续调整计划，或直接让我执行。");
+
+        return sb.toString();
     }
 }

@@ -79,10 +79,12 @@ public final class FancyHelper extends JavaPlugin {
             // 检查 ProtocolLib 依赖并初始化数据包捕获管理器
             if (getServer().getPluginManager().isPluginEnabled("ProtocolLib")) {
                 initPacketCapture();
+                // 初始化告示牌编辑器
+                org.YanPl.gui.SignEditor.init(this);
             } else {
                 getLogger().warning("==================");
                 getLogger().warning("未检测到 ProtocolLib！");
-                getLogger().warning("FancyHelper 的部分高级功能（如命令输出捕获）将无法使用。");
+                getLogger().warning("FancyHelper 的部分高级功能（如命令输出捕获、告示牌编辑）将无法使用。");
                 getLogger().warning("建议前往 https://www.spigotmc.org/resources/protocollib.1997/ 下载并安装以获得最佳体验。");
                 getLogger().warning("==================");
                 packetCaptureManager = null;

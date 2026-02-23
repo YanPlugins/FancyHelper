@@ -26,10 +26,11 @@ public class DetailGUI extends GUI {
     private final GUI prevGUI;
 
     // 槽位定义
-    private static final int EDIT_SLOT = 0;
-    private static final int ADD_BEFORE_SLOT = 1;
-    private static final int ADD_AFTER_SLOT = 2;
-    private static final int DELETE_SLOT = 3;
+    private static final int EDIT_TITLE_SLOT = 0;
+    private static final int EDIT_DESC_SLOT = 1;
+    private static final int ADD_BEFORE_SLOT = 2;
+    private static final int ADD_AFTER_SLOT = 3;
+    private static final int DELETE_SLOT = 4;
     private static final int CANCEL_SLOT = 6;
     private static final int SAVE_SLOT = 8;
 
@@ -78,12 +79,20 @@ public class DetailGUI extends GUI {
             plugin.getLogger().info("DetailGUI handleClick: slot=" + slot + ", step=" + (step != null ? step.getOrder() : "null"));
         }
 
-        // 点击编辑项
-        if (slot == EDIT_SLOT) {
+        // 点击编辑按钮
+        if (slot == EDIT_TITLE_SLOT) {
             if (plugin.getConfigManager().isDebug()) {
-                plugin.getLogger().info("Clicked EDIT_SLOT");
+                plugin.getLogger().info("Clicked EDIT_TITLE_SLOT");
             }
-            openSignEditor();
+            openSignEditor("title");
+            return;
+        }
+
+        if (slot == EDIT_DESC_SLOT) {
+            if (plugin.getConfigManager().isDebug()) {
+                plugin.getLogger().info("Clicked EDIT_DESC_SLOT");
+            }
+            openSignEditor("desc");
             return;
         }
 
@@ -144,15 +153,24 @@ public class DetailGUI extends GUI {
 
     @Override
     public void onClose() {
-        // 清理资源（GUIListener会自动返回上一级）
+        // 关闭详情页不保存，清除临时编辑内容
+        clearTempEdits();
     }
 
     /**
      * 填充Inventory
      */
     private void fillInventory() {
-        // 编辑项
-        inventory.setItem(EDIT_SLOT, createEditItem());
+        // 两个编辑按钮
+        if (step == null) {
+            // 编辑计划：标题和描述
+            inventory.setItem(EDIT_TITLE_SLOT, createTitleEditItem());
+            inventory.setItem(EDIT_DESC_SLOT, createDescEditItem());
+        } else {
+            // 编辑步骤：描述和备注
+            inventory.setItem(EDIT_TITLE_SLOT, createStepDescEditItem());
+            inventory.setItem(EDIT_DESC_SLOT, createStepNotesEditItem());
+        }
 
         // 添加和删除按钮（仅编辑步骤时显示）
         if (step != null) {
@@ -167,7 +185,6 @@ public class DetailGUI extends GUI {
         }
 
         // 空白区域
-        inventory.setItem(4, createGlassPane(" "));
         inventory.setItem(5, createGlassPane(" "));
         inventory.setItem(7, createGlassPane(" "));
 
@@ -179,29 +196,36 @@ public class DetailGUI extends GUI {
     }
 
     /**
-     * 创建编辑项物品
+     * 创建标题编辑物品（编辑计划标题或步骤描述）
      */
-    private ItemStack createEditItem() {
+    private ItemStack createTitleEditItem() {
         ItemStack item = new ItemStack(Material.NAME_TAG);
         ItemMeta meta = item.getItemMeta();
 
         if (meta != null) {
             if (step == null) {
-                // 编辑标题
-                meta.setDisplayName(ChatColor.GOLD + "编辑标题和描述");
+                // 编辑计划标题
+                meta.setDisplayName(ChatColor.GOLD + "编辑标题");
                 List<String> lore = new ArrayList<>();
-                lore.add(ChatColor.GRAY + "标题: " + ChatColor.WHITE + plan.getTitle());
-                lore.add(ChatColor.GRAY + "描述: " + ChatColor.WHITE + plan.getDescription());
+                // 优先显示临时编辑的内容
+                String displayText = tempTitle != null ? tempTitle : plan.getTitle();
+                if (tempTitle != null) {
+                    addMultiLineLore(lore, ChatColor.YELLOW + "(未保存) " + ChatColor.WHITE, displayText);
+                } else {
+                    addMultiLineLore(lore, ChatColor.GRAY + "当前: " + ChatColor.WHITE, displayText);
+                }
                 lore.add("");
                 lore.add(ChatColor.GREEN + "点击编辑");
                 meta.setLore(lore);
             } else {
-                // 编辑步骤
-                meta.setDisplayName(ChatColor.GOLD + "编辑步骤 " + step.getOrder());
+                // 编辑步骤描述
+                meta.setDisplayName(ChatColor.GOLD + "编辑描述");
                 List<String> lore = new ArrayList<>();
-                lore.add(ChatColor.GRAY + "描述: " + ChatColor.WHITE + step.getDescription());
-                if (step.getNotes() != null && !step.getNotes().isEmpty()) {
-                    lore.add(ChatColor.GRAY + "备注: " + ChatColor.WHITE + step.getNotes());
+                String displayText = tempStepDesc != null ? tempStepDesc : step.getDescription();
+                if (tempStepDesc != null) {
+                    addMultiLineLore(lore, ChatColor.YELLOW + "(未保存) " + ChatColor.WHITE, displayText);
+                } else {
+                    addMultiLineLore(lore, ChatColor.GRAY + "当前: " + ChatColor.WHITE, displayText);
                 }
                 lore.add("");
                 lore.add(ChatColor.GREEN + "点击编辑");
@@ -211,6 +235,137 @@ public class DetailGUI extends GUI {
         }
 
         return item;
+    }
+
+    /**
+     * 创建描述编辑物品（编辑计划描述或步骤备注）
+     */
+    private ItemStack createDescEditItem() {
+        ItemStack item = new ItemStack(Material.WRITABLE_BOOK);
+        ItemMeta meta = item.getItemMeta();
+
+        if (meta != null) {
+            if (step == null) {
+                // 编辑计划描述
+                meta.setDisplayName(ChatColor.GOLD + "编辑描述");
+                List<String> lore = new ArrayList<>();
+                // 优先显示临时编辑的内容
+                String displayText = tempDesc != null ? tempDesc : plan.getDescription();
+                if (tempDesc != null) {
+                    addMultiLineLore(lore, ChatColor.YELLOW + "(未保存) " + ChatColor.WHITE, displayText, true);
+                } else {
+                    addMultiLineLore(lore, ChatColor.GRAY + "当前: " + ChatColor.WHITE, displayText, true);
+                }
+                lore.add("");
+                lore.add(ChatColor.GREEN + "点击编辑");
+                meta.setLore(lore);
+            } else {
+                // 编辑步骤备注
+                meta.setDisplayName(ChatColor.GOLD + "编辑备注");
+                List<String> lore = new ArrayList<>();
+                String displayText = tempStepNotes != null ? tempStepNotes : step.getNotes();
+                if (tempStepNotes != null) {
+                    addMultiLineLore(lore, ChatColor.YELLOW + "(未保存) " + ChatColor.WHITE, displayText, true);
+                } else {
+                    addMultiLineLore(lore, ChatColor.GRAY + "当前: " + ChatColor.WHITE, displayText, true);
+                }
+                lore.add("");
+                lore.add(ChatColor.GREEN + "点击编辑");
+                meta.setLore(lore);
+            }
+            item.setItemMeta(meta);
+        }
+
+        return item;
+    }
+
+    /**
+     * 创建步骤描述编辑物品
+     */
+    private ItemStack createStepDescEditItem() {
+        ItemStack item = new ItemStack(Material.NAME_TAG);
+        ItemMeta meta = item.getItemMeta();
+
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.GOLD + "编辑描述");
+            List<String> lore = new ArrayList<>();
+            // 优先显示临时编辑的内容
+            String displayText = tempStepDesc != null ? tempStepDesc : step.getDescription();
+            if (tempStepDesc != null) {
+                addMultiLineLore(lore, ChatColor.YELLOW + "(未保存) " + ChatColor.WHITE, displayText);
+            } else {
+                addMultiLineLore(lore, ChatColor.GRAY + "当前: " + ChatColor.WHITE, displayText);
+            }
+            lore.add("");
+            lore.add(ChatColor.GREEN + "点击编辑");
+            meta.setLore(lore);
+            item.setItemMeta(meta);
+        }
+
+        return item;
+    }
+
+    /**
+     * 创建步骤备注编辑物品
+     */
+    private ItemStack createStepNotesEditItem() {
+        ItemStack item = new ItemStack(Material.WRITABLE_BOOK);
+        ItemMeta meta = item.getItemMeta();
+
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.GOLD + "编辑备注");
+            List<String> lore = new ArrayList<>();
+            // 优先显示临时编辑的内容
+            String displayText = tempStepNotes != null ? tempStepNotes : step.getNotes();
+            if (tempStepNotes != null) {
+                addMultiLineLore(lore, ChatColor.YELLOW + "(未保存) " + ChatColor.WHITE, displayText, true);
+            } else {
+                addMultiLineLore(lore, ChatColor.GRAY + "当前: " + ChatColor.WHITE, displayText, true);
+            }
+            lore.add("");
+            lore.add(ChatColor.GREEN + "点击编辑");
+            meta.setLore(lore);
+            item.setItemMeta(meta);
+        }
+
+        return item;
+    }
+
+    /**
+     * 添加多行内容到lore
+     * @param lore lore列表
+     * @param prefix 第一行的前缀
+     * @param text 文本内容（可能包含换行符）
+     */
+    private void addMultiLineLore(List<String> lore, String prefix, String text) {
+        addMultiLineLore(lore, prefix, text, false);
+    }
+    
+    /**
+     * 添加多行内容到lore
+     * @param lore lore列表
+     * @param prefix 第一行的前缀
+     * @param text 文本内容（可能包含换行符）
+     * @param showEmpty 是否在内容为空时显示"(无)"
+     */
+    private void addMultiLineLore(List<String> lore, String prefix, String text, boolean showEmpty) {
+        if (text == null || text.isEmpty()) {
+            if (showEmpty) {
+                lore.add(prefix + "(无)");
+            } else {
+                lore.add(prefix + "");
+            }
+            return;
+        }
+        
+        String[] lines = text.split("\n");
+        for (int i = 0; i < lines.length; i++) {
+            if (i == 0) {
+                lore.add(prefix + lines[i]);
+            } else {
+                lore.add(ChatColor.WHITE + lines[i]);
+            }
+        }
     }
 
     /**
@@ -241,71 +396,115 @@ public class DetailGUI extends GUI {
 
     /**
      * 打开告示牌编辑器
+     * @param field 要编辑的字段：title（标题/描述）或desc（描述/备注）
      */
-    private void openSignEditor() {
+    private void openSignEditor(String field) {
         String currentText;
+        SignEditor.EditType editType;
 
+        // 获取当前显示的文本（优先显示临时编辑的内容）
         if (step == null) {
-            // 编辑标题和描述
-            currentText = plan.getTitle() + "\n" + plan.getDescription();
+            if ("title".equals(field)) {
+                currentText = tempTitle != null ? tempTitle : plan.getTitle();
+                editType = SignEditor.EditType.SINGLE_LINE;
+            } else {
+                currentText = tempDesc != null ? tempDesc : plan.getDescription();
+                editType = SignEditor.EditType.SINGLE_LINE;
+            }
         } else {
-            // 编辑步骤描述和备注
-            currentText = step.getDescription() + "\n" + (step.getNotes() != null ? step.getNotes() : "");
+            if ("title".equals(field)) {
+                currentText = tempStepDesc != null ? tempStepDesc : step.getDescription();
+                editType = SignEditor.EditType.SINGLE_LINE;
+            } else {
+                currentText = tempStepNotes != null ? tempStepNotes : (step.getNotes() != null ? step.getNotes() : "");
+                editType = SignEditor.EditType.SINGLE_LINE;
+            }
         }
 
-        new SignEditor(plugin, player, currentText, (newText) -> {
-            // 编辑完成回调
-            String[] lines = newText.split("\n", 2);
-
-            if (step == null) {
-                // 更新标题和描述
-                plan.setTitle(lines[0]);
-                if (lines.length > 1) {
-                    plan.setDescription(lines[1]);
-                } else {
-                    plan.setDescription("");
-                }
-            } else {
-                // 更新步骤描述和备注
-                step.setDescription(lines[0]);
-                if (lines.length > 1) {
-                    step.setNotes(lines[1]);
-                } else {
-                    step.setNotes("");
-                }
-            }
-
-            // 刷新界面
+        final String editField = field;
+        
+        // 设置忽略关闭标志，防止SignGUI关闭时触发返回上一级
+        ignoreNextClose = true;
+        
+        new SignEditor(plugin, player, currentText, editType).open((newText) -> {
+            // 编辑完成回调 - 保存到临时变量，等待用户点击保存按钮
+            saveTempEdit(editField, newText);
+            
+            player.sendMessage(ChatColor.GREEN + "» " + ChatColor.WHITE + "编辑完成，点击保存确认修改");
+            
+            // 刷新界面显示编辑后的内容
             refresh();
-
-            player.sendMessage(ChatColor.GREEN + "» " + ChatColor.WHITE + "已更新");
-        }).open((newText) -> {
-            // 编辑完成回调
-            String[] lines = newText.split("\n", 2);
-
-            if (step == null) {
-                // 更新标题和描述
-                plan.setTitle(lines[0]);
-                if (lines.length > 1) {
-                    plan.setDescription(lines[1]);
-                } else {
-                    plan.setDescription("");
+            
+            // 延迟一tick后重新打开详情页
+            new org.bukkit.scheduler.BukkitRunnable() {
+                @Override
+                public void run() {
+                    open();
                 }
-            } else {
-                // 更新步骤描述和备注
-                step.setDescription(lines[0]);
-                if (lines.length > 1) {
-                    step.setNotes(lines[1]);
-                } else {
-                    step.setNotes("");
-                }
-            }
-
-            // 刷新界面
-            refresh();
-
-            player.sendMessage(ChatColor.GREEN + "» " + ChatColor.WHITE + "已更新");
+            }.runTaskLater(plugin, 1L);
         });
+    }
+    
+    /**
+     * 临时编辑内容（未保存到plan）
+     */
+    private String tempTitle = null;
+    private String tempDesc = null;
+    private String tempStepDesc = null;
+    private String tempStepNotes = null;
+    
+    /**
+     * 保存临时编辑内容
+     */
+    private void saveTempEdit(String field, String text) {
+        if (step == null) {
+            if ("title".equals(field)) {
+                tempTitle = text;
+            } else {
+                tempDesc = text;
+            }
+        } else {
+            if ("title".equals(field)) {
+                tempStepDesc = text;
+            } else {
+                tempStepNotes = text;
+            }
+        }
+    }
+    
+    /**
+     * 应用临时编辑到plan
+     */
+    private void applyTempEdits() {
+        if (step == null) {
+            if (tempTitle != null) {
+                plan.setTitle(tempTitle);
+                tempTitle = null;
+            }
+            if (tempDesc != null) {
+                plan.setDescription(tempDesc);
+                tempDesc = null;
+            }
+        } else {
+            if (tempStepDesc != null) {
+                step.setDescription(tempStepDesc);
+                tempStepDesc = null;
+            }
+            if (tempStepNotes != null) {
+                step.setNotes(tempStepNotes);
+                tempStepNotes = null;
+            }
+        }
+    }
+    
+    /**
+     * 清除临时编辑内容
+     */
+    private void clearTempEdits() {
+        tempTitle = null;
+        tempDesc = null;
+        tempStepDesc = null;
+        tempStepNotes = null;
     }
 
     /**
@@ -380,11 +579,42 @@ public class DetailGUI extends GUI {
     }
 
     /**
-     * 保存修改
+     * 保存修改（返回主界面，不设置待发送消息）
      */
     private void save() {
+        // 应用临时编辑到plan
+        applyTempEdits();
+        
+        // 标记计划已修改
+        plan.setModified(true);
+        
         // 返回上一级（会刷新主界面）
         plugin.getGuiManager().backToPrev(player);
-        player.sendMessage(ChatColor.GREEN + "» " + ChatColor.WHITE + "已保存");
+        
+        player.sendMessage(ChatColor.GREEN + "» " + ChatColor.WHITE + "修改已保存到临时计划");
+    }
+    
+    /**
+     * 构建计划摘要，用于发送给AI
+     */
+    private String buildPlanSummary() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("#saved_plan: 用户已修改计划，内容如下：\n\n");
+        sb.append("计划标题: ").append(plan.getTitle()).append("\n");
+        sb.append("计划描述: ").append(plan.getDescription()).append("\n\n");
+        sb.append("执行步骤:\n");
+        
+        for (int i = 0; i < plan.getSteps().size(); i++) {
+            PlanStep step = plan.getSteps().get(i);
+            sb.append("  ").append(i + 1).append(". ").append(step.getDescription());
+            if (step.getNotes() != null && !step.getNotes().isEmpty()) {
+                sb.append(" (备注: ").append(step.getNotes()).append(")");
+            }
+            sb.append("\n");
+        }
+        
+        sb.append("\n用户可以继续调整计划，或直接让我执行。");
+        
+        return sb.toString();
     }
 }

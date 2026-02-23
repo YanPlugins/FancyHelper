@@ -887,7 +887,20 @@ public class CLIManager {
         DialogueSession session = sessions.get(uuid);
         if (session == null) return;
 
-        session.addMessage("user", message);
+        // 检查是否有待发送的计划内容
+        String pendingPlan = session.getPendingPlanMessage();
+        final String finalMessage;
+        if (pendingPlan != null && !pendingPlan.isEmpty()) {
+            // 将计划内容附加到消息前面
+            finalMessage = pendingPlan + "\n\n用户消息: " + message;
+            // 清除待发送的计划
+            session.clearPendingPlanMessage();
+            player.sendMessage(ChatColor.GRAY + "» " + ChatColor.AQUA + "已附带保存的计划内容");
+        } else {
+            finalMessage = message;
+        }
+
+        session.addMessage("user", finalMessage);
         isGenerating.put(uuid, true);
         generationStates.put(uuid, GenerationStatus.THINKING);
         generationStartTimes.put(uuid, System.currentTimeMillis());
@@ -1306,7 +1319,20 @@ public class CLIManager {
         DialogueSession session = sessions.get(uuid);
         if (session == null) return;
 
-        session.addMessage("user", feedback);
+        // 检查是否有待发送的计划内容
+        String pendingPlan = session.getPendingPlanMessage();
+        final String finalFeedback;
+        if (pendingPlan != null && !pendingPlan.isEmpty()) {
+            // 将计划内容附加到反馈前面
+            finalFeedback = pendingPlan + "\n\n" + feedback;
+            // 清除待发送的计划
+            session.clearPendingPlanMessage();
+            player.sendMessage(ChatColor.GRAY + "» " + ChatColor.AQUA + "已附带保存的计划内容");
+        } else {
+            finalFeedback = feedback;
+        }
+
+        session.addMessage("user", finalFeedback);
         
         // 记录反馈后的 Token 估算
         int estimatedTokens = calculateTotalEstimatedTokens(player, session);

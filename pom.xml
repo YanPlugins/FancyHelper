@@ -48,6 +48,10 @@
                                     <pattern>org.bstats</pattern>
                                     <shadedPattern>org.YanPl.bstats</shadedPattern>
                                 </relocation>
+                                <relocation>
+                                    <pattern>de.rapha149.signgui</pattern>
+                                    <shadedPattern>org.YanPl.signgui</shadedPattern>
+                                </relocation>
                             </relocations>
                             <filters>
                                 <filter>
@@ -166,6 +170,11 @@
             <groupId>com.knuddels</groupId>
             <artifactId>jtokkit</artifactId>
             <version>0.6.0</version>
+        </dependency>
+        <dependency>
+            <groupId>de.rapha149.signgui</groupId>
+            <artifactId>signgui</artifactId>
+            <version>2.5.4</version>
         </dependency>
         <!-- 测试依赖 -->
         <dependency>

@@ -17,6 +17,12 @@ public abstract class GUI implements InventoryHolder {
     protected final Player player;
     protected final UUID playerUUID;
     protected Inventory inventory;
+    
+    /**
+     * 是否忽略下一次关闭事件
+     * 用于在打开其他界面（如告示牌编辑器）时防止GUI被关闭
+     */
+    protected boolean ignoreNextClose = false;
 
     /**
      * 构造函数
@@ -58,6 +64,25 @@ public abstract class GUI implements InventoryHolder {
      * 关闭GUI时的清理
      */
     public abstract void onClose();
+    
+    /**
+     * 设置是否忽略下一次关闭事件
+     */
+    public void setIgnoreNextClose(boolean ignore) {
+        this.ignoreNextClose = ignore;
+    }
+    
+    /**
+     * 检查并清除忽略关闭标志
+     * @return 是否应该忽略此次关闭
+     */
+    public boolean checkAndClearIgnoreClose() {
+        if (ignoreNextClose) {
+            ignoreNextClose = false;
+            return true;
+        }
+        return false;
+    }
 
     @Override
     public Inventory getInventory() {
