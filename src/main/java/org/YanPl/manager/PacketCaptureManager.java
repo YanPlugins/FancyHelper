@@ -69,6 +69,7 @@ public class PacketCaptureManager {
                                 stripped.startsWith("◆") || 
                                 stripped.contains("FancyHelper") ||
                                 stripped.equals("....") ||
+                                stripped.equals("...") ||
                                 stripped.equals("- ✓ -") ||
                                 stripped.equals("- ✕ -") ||
                                 stripped.equals("- ERROR -") ||

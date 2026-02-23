@@ -152,7 +152,7 @@ public class CloudFlareAI {
 
             if (content == null || role == null) {
                 if (plugin.getConfigManager().isDebug()) {
-                    plugin.getLogger().warning("[AI 请求] 跳过内容或角色为空的消息");
+                    plugin.getLogger().info("[AI 请求] 已跳过内容或角色为空的消息 (Role: " + role + ")");
                 }
                 continue;
             }
@@ -162,7 +162,7 @@ public class CloudFlareAI {
 
             if (content.isEmpty() || role.isEmpty()) {
                 if (plugin.getConfigManager().isDebug()) {
-                    plugin.getLogger().warning("[AI 请求] 跳过修整后内容或角色为空的消息");
+                    plugin.getLogger().info("[AI 请求] 已跳过修整后为空的消息 (Role: " + role + ")");
                 }
                 continue;
             }

@@ -227,18 +227,33 @@ public class ToolExecutor {
      * 检查是否为风险命令
      */
     private boolean isRiskyCommand(String cmd) {
+        String cleanCmd = cmd.trim();
+        if (cleanCmd.toLowerCase().startsWith("minecraft:")) {
+            cleanCmd = cleanCmd.substring(10).trim();
+        }
+        
+        // 处理 execute 命令的递归检查
+        if (cleanCmd.toLowerCase().startsWith("execute")) {
+            String lower = cleanCmd.toLowerCase();
+            int runIndex = lower.indexOf(" run ");
+            if (runIndex != -1) {
+                String subCmd = cleanCmd.substring(runIndex + 5).trim();
+                return isRiskyCommand(subCmd);
+            }
+        }
+
         List<String> risky = plugin.getConfigManager().getYoloRiskCommands();
         if (risky == null || risky.isEmpty()) return false;
         
-        String lc = cmd.toLowerCase();
+        String lc = cleanCmd.toLowerCase();
         for (String r : risky) {
             if (r == null) continue;
             String rr = r.trim().toLowerCase();
             if (rr.isEmpty()) continue;
-            if (lc.startsWith(rr)) return true;
-            int spaceIdx = lc.indexOf(' ');
-            String first = spaceIdx >= 0 ? lc.substring(0, spaceIdx) : lc;
-            if (first.equals(rr)) return true;
+            
+            // 精确匹配命令名或带参数的命令
+            if (lc.equals(rr)) return true;
+            if (lc.startsWith(rr + " ")) return true;
         }
         return false;
     }
@@ -530,31 +545,36 @@ public class ToolExecutor {
             boolean finalSuccess = success;
 
             if (!plugin.isEnabled()) return;
+            
+            // 延迟 1 秒 (20 ticks) 检查反馈
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                String packetOutput = "";
+                String currentPacketOutput = "";
                 String currentProxyOutput = output.toString();
-                
-                // 1. 检查是否有初步输出
                 boolean hasOutput = false;
+
+                // 检查 PacketCapture 是否有内容
                 if (plugin.getPacketCaptureManager() != null) {
-                    String peek = plugin.getPacketCaptureManager().peekCapture(player);
-                    if (peek != null && !peek.isEmpty()) hasOutput = true;
+                    currentPacketOutput = plugin.getPacketCaptureManager().peekCapture(player);
+                    if (!currentPacketOutput.isEmpty()) hasOutput = true;
                 }
+                // 检查拦截器是否有内容
                 if (!currentProxyOutput.isEmpty()) hasOutput = true;
 
-                // 2. 如果有输出，直接结束并返回
-                if (hasOutput) {
+                // 如果有输出，或者命令执行失败，则立即结束
+                if (hasOutput || !finalSuccess) {
+                    String finalPacketOutput = "";
                     if (plugin.getPacketCaptureManager() != null) {
-                        packetOutput = plugin.getPacketCaptureManager().stopCapture(player);
+                        finalPacketOutput = plugin.getPacketCaptureManager().stopCapture(player);
                     }
-                    String finalResult = buildCommandResult(command, packetOutput, currentProxyOutput, finalSuccess);
+                    String finalResult = buildCommandResult(command, finalPacketOutput, currentProxyOutput, finalSuccess);
                     player.sendMessage(ChatColor.GRAY + "⇒ 反馈已发送至 Fancy");
                     cliManager.feedbackToAI(player, "#run_result: " + finalResult);
                     return;
                 }
 
-                // 3. 如果没有输出，继续等待 5 秒 (100 ticks)
+                // 如果没有输出，延长等待 5 秒 (100 ticks)
                 player.sendMessage(ChatColor.GRAY + "⇒ 暂无反馈，延长等待 5秒...");
+                
                 Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     String delayedPacketOutput = "";
                     if (plugin.getPacketCaptureManager() != null) {
