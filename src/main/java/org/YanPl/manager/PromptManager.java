@@ -171,11 +171,12 @@ public class PromptManager {
             sb.append("  #ls: <path> - List directory contents. Example: #ls: plugins/FancyHelper\n");
         }
         if (plugin.getConfigManager().isPlayerToolEnabled(player, "read")) {
-            sb.append("  #read: <path> - Read file content. Example: #read: plugins/FancyHelper/config.yml\n");
+            sb.append("  #read: <path> [start]-[end] - Read file content. Optional line range. Example: #read: plugins/FancyHelper/config.yml 1-50\n");
         }
         if (plugin.getConfigManager().isPlayerToolEnabled(player, "diff")) {
-            sb.append("  #diff: <path>|<search>|<replace> - Modify file content (find and replace).\n");
-            sb.append("    Note: Ensure precise matching. No extra spaces around | separator.\n");
+            sb.append("  #diff: <path>|<search_or_range>|<replace> - Modify file content.\n");
+            sb.append("    Mode 1 (Text Match): #diff: path|search|replace\n");
+            sb.append("    Mode 2 (Line Range): #diff: path|start-end|content (e.g. #diff: file.yml|10-20|new lines)\n");
             sb.append("    Constraint: #diff must be the last part of response. No #over after it.\n");
         }
         sb.append("\n");

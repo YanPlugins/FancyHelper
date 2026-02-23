@@ -259,7 +259,7 @@ public class ToolExecutor {
                 sendConfirmButtons(player, cleanCommand);
                 return true;
             } else {
-                player.sendMessage(ChatColor.GOLD + "⇒ YOLO RUN " + ChatColor.WHITE + cleanCommand);
+                player.sendMessage(ChatColor.GOLD + ">> YOLO RUN " + ChatColor.WHITE + cleanCommand);
                 cliManager.setGenerating(uuid, false, CLIManager.GenerationStatus.EXECUTING_TOOL);
                 executeCommand(player, cleanCommand);
                 return true;
@@ -358,7 +358,7 @@ public class ToolExecutor {
      */
     public void sendConfirmButtons(Player player, String displayAction) {
         TextComponent message = new TextComponent(displayAction != null && !displayAction.trim().isEmpty() 
-            ? (ChatColor.GRAY + "⇒ " + displayAction + " ") : "");
+            ? (ChatColor.GRAY + ">> " + ChatColor.WHITE + displayAction + " ") : "");
 
         TextComponent yBtn = new TextComponent(ChatColor.GREEN + "[ Y ]");
         yBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli confirm"));
@@ -465,7 +465,30 @@ public class ToolExecutor {
      * 执行 read 操作
      */
     private String executeReadOperation(File root, String pathArg) throws IOException {
-        File file = new File(root, pathArg);
+        String[] parts = pathArg.split("\\s+");
+        String path = parts[0];
+        int startLine = 1;
+        int endLine = -1;
+
+        if (parts.length > 1) {
+            String range = parts[1];
+            try {
+                if (range.contains("-")) {
+                    String[] rangeParts = range.split("-");
+                    if (rangeParts.length > 0 && !rangeParts[0].isEmpty()) {
+                        startLine = Integer.parseInt(rangeParts[0]);
+                    }
+                    if (rangeParts.length > 1 && !rangeParts[1].isEmpty()) {
+                        endLine = Integer.parseInt(rangeParts[1]);
+                    }
+                } else {
+                    startLine = Integer.parseInt(range);
+                    endLine = startLine; // Read single line
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+
+        File file = new File(root, path);
         
         if (!isWithinRoot(root, file)) {
             return "错误: 路径超出服务器目录限制";
@@ -476,11 +499,34 @@ public class ToolExecutor {
         if (file.isDirectory()) {
             return "错误: 这是一个目录，请使用 #ls";
         }
-        if (file.length() > 1024 * 100) {
-            return "错误: 文件太大 (" + (file.length() / 1024) + "KB)，无法直接读取，请分段读取或选择其他方式";
+        if (file.length() > 1024 * 1024) {
+            return "错误: 文件过大 (" + (file.length() / 1024) + "KB)，无法读取。";
         }
 
-        return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+        StringBuilder content = new StringBuilder();
+        try (java.io.BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
+            String line;
+            int currentLine = 1;
+            int maxLines = 500;
+            int readCount = 0;
+            
+            while ((line = reader.readLine()) != null) {
+                boolean inRange = true;
+                if (currentLine < startLine) inRange = false;
+                if (endLine != -1 && currentLine > endLine) inRange = false;
+
+                if (inRange) {
+                    if (readCount >= maxLines) {
+                        content.append("\n... (内容过长，已截断显示 " + maxLines + " 行) ...");
+                        break;
+                    }
+                    content.append(line).append("\n");
+                    readCount++;
+                }
+                currentLine++;
+            }
+        }
+        return content.toString();
     }
 
     /**
@@ -496,6 +542,21 @@ public class ToolExecutor {
         String path = diffParts[0].trim();
         String search = diffParts[1];
         String replace = diffParts[2];
+        
+        // 检查是否是行号范围模式
+        // 格式：#diff: path | 10-15 | content
+        boolean isLineMode = false;
+        int startLine = -1;
+        int endLine = -1;
+        
+        if (search.trim().matches("^\\d+-\\d+$")) {
+            try {
+                String[] range = search.trim().split("-");
+                startLine = Integer.parseInt(range[0]);
+                endLine = Integer.parseInt(range[1]);
+                isLineMode = true;
+            } catch (NumberFormatException ignored) {}
+        }
 
         File file = new File(root, path);
         
@@ -506,6 +567,45 @@ public class ToolExecutor {
             return "错误: 文件不存在";
         }
 
+        if (isLineMode) {
+            // 行号模式替换
+            List<String> lines = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8);
+            if (startLine < 1 || startLine > lines.size() + 1) { // 允许追加到末尾
+                 return "错误: 起始行号无效 (文件总行数: " + lines.size() + ")";
+            }
+            if (endLine > lines.size()) {
+                 endLine = lines.size(); // 自动修正结束行号
+            }
+            if (startLine > endLine) {
+                 // 可能是插入操作？暂时不允许反向范围
+                 return "错误: 起始行号不能大于结束行号";
+            }
+            
+            List<String> newLines = new java.util.ArrayList<>();
+            
+            // 复制前面的行
+            for (int i = 0; i < startLine - 1; i++) {
+                newLines.add(lines.get(i));
+            }
+            
+            // 插入新内容
+            if (replace != null && !replace.isEmpty()) {
+                String[] replaceLines = replace.split("\n");
+                for (String rLine : replaceLines) {
+                    newLines.add(rLine);
+                }
+            }
+            
+            // 复制后面的行
+            for (int i = endLine; i < lines.size(); i++) {
+                newLines.add(lines.get(i));
+            }
+            
+            Files.write(file.toPath(), newLines, StandardCharsets.UTF_8);
+            return "成功修改文件 (行号模式): " + path + " [" + startLine + "-" + endLine + "]";
+        }
+
+        // 原有的内容匹配模式
         String content = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
 
         // 智能处理空格
@@ -520,11 +620,12 @@ public class ToolExecutor {
             }
         }
 
-        if (!content.contains(search)) {
+        int index = content.indexOf(search);
+        if (index == -1) {
             return "错误: 未在文件中找到指定的查找内容，请确保查找内容完全匹配（包括缩进）";
         }
 
-        String newContent = content.replace(search, replace);
+        String newContent = content.substring(0, index) + replace + content.substring(index + search.length());
         Files.write(file.toPath(), newContent.getBytes(StandardCharsets.UTF_8));
 
         return "成功修改文件: " + path + "\n修改内容摘要：\n- 查找: " + 
@@ -537,7 +638,14 @@ public class ToolExecutor {
      */
     private boolean isWithinRoot(File root, File file) {
         try {
-            return file.getCanonicalPath().startsWith(root.getCanonicalPath());
+            String rootPath = root.getCanonicalPath();
+            String filePath = file.getCanonicalPath();
+
+            if (!rootPath.endsWith(File.separator)) {
+                rootPath += File.separator;
+            }
+
+            return filePath.equals(root.getCanonicalPath()) || filePath.startsWith(rootPath);
         } catch (IOException e) {
             return false;
         }

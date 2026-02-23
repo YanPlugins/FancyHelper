@@ -725,12 +725,12 @@ public class CLIManager {
                     recordThinkingTime(uuid);
                     generationStates.put(uuid, GenerationStatus.CANCELLED);
                     generationStartTimes.put(uuid, System.currentTimeMillis());
-                    player.sendMessage(ChatColor.YELLOW + "⇒ 已打断 Fancy 生成");
+                    player.sendMessage(ChatColor.YELLOW + "✕" + ChatColor.WHITE + " 已打断 Fancy 生成");
                     interrupted = true;
                 }
                 if (pendingCommands.containsKey(uuid)) {
                     pendingCommands.remove(uuid);
-                    player.sendMessage(ChatColor.GRAY + "⇒ 已取消当前待处理的操作");
+                    player.sendMessage(ChatColor.YELLOW + "✕" + ChatColor.WHITE + " 已取消当前待处理的操作");
                     isGenerating.put(uuid, false);
                     generationStates.put(uuid, GenerationStatus.CANCELLED);
                     generationStartTimes.put(uuid, System.currentTimeMillis());
@@ -1031,11 +1031,6 @@ public class CLIManager {
             }
         }
 
-        // 收到 AI 回复，立即停止计时
-        recordThinkingTime(uuid);
-        generationStates.put(uuid, GenerationStatus.COMPLETED);
-        generationStartTimes.remove(uuid);
-
         // 如果生成已被打断，则丢弃响应
         if (!isGenerating.getOrDefault(uuid, false)) {
             if (plugin.getConfigManager().isDebug()) {
@@ -1043,6 +1038,11 @@ public class CLIManager {
             }
             return;
         }
+
+        // 收到 AI 回复，立即停止计时
+        recordThinkingTime(uuid);
+        generationStates.put(uuid, GenerationStatus.COMPLETED);
+        generationStartTimes.remove(uuid);
 
         String response = aiResponse.getContent();
         String thoughtContent = aiResponse.getThought() != null ? aiResponse.getThought() : "";
