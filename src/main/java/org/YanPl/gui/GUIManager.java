@@ -93,11 +93,13 @@ public class GUIManager {
         GUI currentGUI = stack.pop();
         currentGUI.onClose();
 
-        // 如果栈不为空，打开上一个GUI
+        // 如果栈不为空，延迟打开上一个GUI
+        // 必须使用runTask延迟执行，避免在InventoryCloseEvent处理过程中打开inventory导致状态不一致
         if (!stack.isEmpty()) {
             GUI prevGUI = stack.peek();
-            // 直接打开，不使用runTask
-            prevGUI.open();
+            org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                prevGUI.open();
+            });
             return true;
         } else {
             // 栈已空，关闭Inventory
