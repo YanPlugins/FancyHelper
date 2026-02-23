@@ -163,10 +163,23 @@ public class PlanEditGUI extends GUI {
         ItemMeta meta = titleItem.getItemMeta();
 
         if (meta != null) {
-            meta.setDisplayName(ChatColor.GOLD + "计划标题: " + ChatColor.WHITE + temporaryPlan.getTitle());
+            // 标题只显示第一行，其余放在lore中
+            String title = temporaryPlan.getTitle();
+            String titleFirstLine = title != null && title.contains("\n") ? title.split("\n")[0] : title;
+            meta.setDisplayName(ChatColor.GOLD + "计划标题: " + ChatColor.WHITE + (titleFirstLine != null ? titleFirstLine : "(未设置)"));
 
             List<String> lore = new ArrayList<>();
-            lore.add(ChatColor.GRAY + "描述: " + ChatColor.WHITE + temporaryPlan.getDescription());
+            // 标题如果有多行，显示在lore中
+            if (title != null && title.contains("\n")) {
+                String[] titleLines = title.split("\n");
+                for (int i = 1; i < titleLines.length; i++) {
+                    lore.add(ChatColor.WHITE + "    " + titleLines[i]);
+                }
+            }
+            
+            lore.add("");
+            // 描述可能多行
+            addMultiLineLore(lore, ChatColor.GRAY + "描述: " + ChatColor.WHITE, temporaryPlan.getDescription());
             lore.add("");
             lore.add(ChatColor.GRAY + "步骤数量: " + ChatColor.YELLOW + temporaryPlan.getSteps().size());
             lore.add("");
