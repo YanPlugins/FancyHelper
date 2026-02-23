@@ -395,56 +395,134 @@ public class DetailGUI extends GUI {
     }
 
     /**
-     * 打开告示牌编辑器
-     * @param field 要编辑的字段：title（标题/描述）或desc（描述/备注）
-     */
-    private void openSignEditor(String field) {
-        String currentText;
-        SignEditor.EditType editType;
-
-        // 获取当前显示的文本（优先显示临时编辑的内容）
-        if (step == null) {
-            if ("title".equals(field)) {
-                currentText = tempTitle != null ? tempTitle : plan.getTitle();
-                editType = SignEditor.EditType.SINGLE_LINE;
+         * 打开告示牌编辑器
+         * @param field 要编辑的字段：title（标题/描述）或desc（描述/备注）
+         */
+        private void openSignEditor(String field) {
+            String currentText;
+            SignEditor.EditType editType;
+    
+            // 获取当前显示的文本（优先显示临时编辑的内容）
+            if (step == null) {
+                if ("title".equals(field)) {
+                    currentText = tempTitle != null ? tempTitle : plan.getTitle();
+                    editType = SignEditor.EditType.SINGLE_LINE;
+                } else {
+                    currentText = tempDesc != null ? tempDesc : plan.getDescription();
+                    editType = SignEditor.EditType.SINGLE_LINE;
+                }
             } else {
-                currentText = tempDesc != null ? tempDesc : plan.getDescription();
-                editType = SignEditor.EditType.SINGLE_LINE;
+                if ("title".equals(field)) {
+                    currentText = tempStepDesc != null ? tempStepDesc : step.getDescription();
+                    editType = SignEditor.EditType.SINGLE_LINE;
+                } else {
+                    currentText = tempStepNotes != null ? tempStepNotes : (step.getNotes() != null ? step.getNotes() : "");
+                    editType = SignEditor.EditType.SINGLE_LINE;
+                }
             }
-        } else {
-            if ("title".equals(field)) {
-                currentText = tempStepDesc != null ? tempStepDesc : step.getDescription();
-                editType = SignEditor.EditType.SINGLE_LINE;
+    
+            final String editField = field;
+    
+            // 检查是否需要使用多行编辑器
+            // 条件：1. 文本超过4行  2. 文本太宽拆分后超过4行（显示宽度 > 60）
+            boolean needsMultiLineEditor = needsMultiLineEditor(currentText);
+    
+            if (plugin.getConfigManager().isDebug()) {
+                plugin.getLogger().info("=== DetailGUI.openSignEditor ===");
+                plugin.getLogger().info("field: " + field);
+                plugin.getLogger().info("currentText: " + currentText);
+                plugin.getLogger().info("使用MultiLineEditorGUI: " + needsMultiLineEditor);
+            }
+    
+            if (needsMultiLineEditor) {
+                // 设置忽略关闭标志，防止打开编辑器时触发返回上一级
+                ignoreNextClose = true;
+
+                // 打开多行编辑器
+                plugin.getGuiManager().openGUI(player, new MultiLineEditorGUI(
+                    plugin, 
+                    player, 
+                    currentText, 
+                    (newText) -> {
+                        // 编辑完成回调 - 只保存到临时变量，不处理界面跳转
+                        saveTempEdit(editField, newText);
+                    },
+                    this
+                ));
             } else {
-                currentText = tempStepNotes != null ? tempStepNotes : (step.getNotes() != null ? step.getNotes() : "");
-                editType = SignEditor.EditType.SINGLE_LINE;
+                // 设置忽略关闭标志，防止SignGUI关闭时触发返回上一级
+                ignoreNextClose = true;
+    
+                new SignEditor(plugin, player, currentText, editType).open((newText) -> {
+                    // 编辑完成回调 - 保存到临时变量，等待用户点击保存按钮
+                    saveTempEdit(editField, newText);
+                    
+                    player.sendMessage(ChatColor.GREEN + "» " + ChatColor.WHITE + "编辑完成，点击保存确认修改");
+                    
+                    // 刷新界面显示编辑后的内容
+                    refresh();
+                    
+                    // 延迟一tick后重新打开详情页
+                    new org.bukkit.scheduler.BukkitRunnable() {
+                        @Override
+                        public void run() {
+                            open();
+                        }
+                    }.runTaskLater(plugin, 1L);
+                });
             }
         }
-
-        final String editField = field;
-        
-        // 设置忽略关闭标志，防止SignGUI关闭时触发返回上一级
-        ignoreNextClose = true;
-        
-        new SignEditor(plugin, player, currentText, editType).open((newText) -> {
-            // 编辑完成回调 - 保存到临时变量，等待用户点击保存按钮
-            saveTempEdit(editField, newText);
-            
-            player.sendMessage(ChatColor.GREEN + "» " + ChatColor.WHITE + "编辑完成，点击保存确认修改");
-            
-            // 刷新界面显示编辑后的内容
-            refresh();
-            
-            // 延迟一tick后重新打开详情页
-            new org.bukkit.scheduler.BukkitRunnable() {
-                @Override
-                public void run() {
-                    open();
-                }
-            }.runTaskLater(plugin, 1L);
-        });
-    }
     
+        /**
+         * 检查文本是否需要多行编辑器
+         * 条件：1. 文本超过4行（基于换行符）  2. 文本太宽拆分后超过4行（显示宽度 > 60）
+         */
+        private boolean needsMultiLineEditor(String text) {
+            if (text == null || text.isEmpty()) {
+                return false;
+            }
+    
+            // 条件1：文本超过4行（基于换行符）
+            int lineCount = getLineCount(text);
+            if (lineCount > 4) {
+                if (plugin.getConfigManager().isDebug()) {
+                    plugin.getLogger().info("needsMultiLineEditor: lineCount = " + lineCount + " > 4");
+                }
+                return true;
+            }
+    
+            // 条件2：文本太宽拆分后超过4行（显示宽度 > 60）
+            int displayWidth = SignEditor.getDisplayWidth(text);
+            if (displayWidth > 60) {
+                if (plugin.getConfigManager().isDebug()) {
+                    plugin.getLogger().info("needsMultiLineEditor: displayWidth = " + displayWidth + " > 60");
+                }
+                return true;
+            }
+    
+            if (plugin.getConfigManager().isDebug()) {
+                plugin.getLogger().info("needsMultiLineEditor: lineCount = " + lineCount + ", displayWidth = " + displayWidth + " (无需多行编辑)");
+            }
+            return false;
+        }
+    
+        /**
+         * 获取文本的行数（基于换行符）
+         */
+        private int getLineCount(String text) {
+            if (text == null || text.isEmpty()) {
+                return 0;
+            }
+            String[] lines = text.split("\n", -1);
+            int count = lines.length;
+            if (plugin.getConfigManager().isDebug()) {
+                plugin.getLogger().info("getLineCount: split result length = " + count);
+                for (int i = 0; i < Math.min(10, lines.length); i++) {
+                    plugin.getLogger().info("  line[" + i + "]: '" + lines[i] + "'");
+                }
+            }
+            return count;
+        }    
     /**
      * 临时编辑内容（未保存到plan）
      */
