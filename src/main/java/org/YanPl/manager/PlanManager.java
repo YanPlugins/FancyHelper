@@ -34,6 +34,7 @@ public class PlanManager {
     private final Map<UUID, List<Question>> questionsMap = new ConcurrentHashMap<>();
     private final Map<UUID, ExecutionPlan> plansMap = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> questionIndexMap = new ConcurrentHashMap<>();
+    private final Map<UUID, org.YanPl.gui.PlanEditGUI> editGUIMap = new ConcurrentHashMap<>();
 
     public PlanManager(FancyHelper plugin, CLIManager cliManager, ToolExecutor toolExecutor) {
         this.plugin = plugin;
@@ -408,10 +409,10 @@ public class PlanManager {
 
     /**
      * 发送执行选项
-     * 
+     *
      * @param player 玩家
      */
-    private void sendExecutionOptions(Player player) {
+    public void sendExecutionOptions(Player player) {
         TextComponent message = new TextComponent(ChatColor.GREEN + "✓ " + ChatColor.WHITE + "计划已生成！请选择执行模式：\n");
         
         TextComponent yoloBtn = new TextComponent(ChatColor.GREEN + "[ YOLO模式 ]");
@@ -483,7 +484,7 @@ public class PlanManager {
 
     /**
      * 打开计划修改GUI
-     * 
+     *
      * @param player 玩家
      */
     public void openPlanEditGUI(Player player) {
@@ -492,9 +493,29 @@ public class PlanManager {
             player.sendMessage(ChatColor.RED + "没有可编辑的计划");
             return;
         }
-        
-        player.sendMessage(ChatColor.GRAY + "» " + ChatColor.WHITE + "计划编辑功能开发中...");
-        // TODO: 实现Inventory GUI
+
+        UUID uuid = player.getUniqueId();
+
+        // 检查是否已有编辑GUI实例
+        org.YanPl.gui.PlanEditGUI editGUI = editGUIMap.get(uuid);
+
+        if (editGUI == null) {
+            // 创建新的编辑GUI实例
+            editGUI = new org.YanPl.gui.PlanEditGUI(plugin, player, plan);
+            editGUIMap.put(uuid, editGUI);
+        }
+
+        // 使用guiManager打开GUI，确保压入栈中
+        plugin.getGuiManager().openGUI(player, editGUI);
+    }
+
+    /**
+     * 清理编辑GUI实例
+     *
+     * @param uuid 玩家UUID
+     */
+    public void clearEditGUI(UUID uuid) {
+        editGUIMap.remove(uuid);
     }
 
     /**
@@ -552,8 +573,25 @@ public class PlanManager {
                 break;
             case CONTINUE:
                 player.sendMessage(ChatColor.AQUA + "✓ " + ChatColor.WHITE + "继续规划模式");
-                // 通知AI继续提问
-                cliManager.feedbackToAI(player, "#continue_planning: 请继续提问以补充信息");
+                // 如果计划有修改，先发送修改后的计划
+                DialogueSession session = cliManager.getSession(player.getUniqueId());
+                if (session != null) {
+                    String pendingPlan = session.getPendingPlanMessage();
+                    if (pendingPlan != null && !pendingPlan.isEmpty()) {
+                        // 有保存的计划修改，附加到消息中
+                        cliManager.feedbackToAI(player, "#continue_planning: 请继续提问以补充信息");
+                    } else if (plan.isModified()) {
+                        // 计划已修改但未保存，发送当前计划
+                        String planSummary = buildPlanSummary(plan);
+                        session.setPendingPlanMessage(planSummary);
+                        cliManager.feedbackToAI(player, "#continue_planning: 请继续提问以补充信息");
+                    } else {
+                        // 计划未修改，直接继续
+                        cliManager.feedbackToAI(player, "#continue_planning: 请继续提问以补充信息");
+                    }
+                } else {
+                    cliManager.feedbackToAI(player, "#continue_planning: 请继续提问以补充信息");
+                }
                 break;
         }
     }
@@ -643,5 +681,32 @@ public class PlanManager {
      */
     public ExecutionPlan getPlan(Player player) {
         return plansMap.get(player.getUniqueId());
+    }
+
+    /**
+     * 构建计划摘要，用于发送给AI
+     * 
+     * @param plan 执行计划
+     * @return 计划摘要字符串
+     */
+    private String buildPlanSummary(ExecutionPlan plan) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("#saved_plan: 用户已修改计划，内容如下：\n\n");
+        sb.append("计划标题: ").append(plan.getTitle()).append("\n");
+        sb.append("计划描述: ").append(plan.getDescription()).append("\n\n");
+        sb.append("执行步骤:\n");
+
+        for (int i = 0; i < plan.getSteps().size(); i++) {
+            PlanStep step = plan.getSteps().get(i);
+            sb.append("  ").append(i + 1).append(". ").append(step.getDescription());
+            if (step.getNotes() != null && !step.getNotes().isEmpty()) {
+                sb.append(" (备注: ").append(step.getNotes()).append(")");
+            }
+            sb.append("\n");
+        }
+
+        sb.append("\n用户可以继续调整计划，或直接让我执行。");
+
+        return sb.toString();
     }
 }

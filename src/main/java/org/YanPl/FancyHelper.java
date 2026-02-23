@@ -4,6 +4,8 @@ import org.YanPl.api.MetasoAPI;
 import org.YanPl.api.TavilyAPI;
 import org.YanPl.command.CLICommand;
 import org.YanPl.listener.ChatListener;
+import org.YanPl.listener.GUIListener;
+import org.YanPl.gui.GUIManager;
 import org.YanPl.manager.CLIManager;
 import org.YanPl.manager.ConfigManager;
 import org.YanPl.manager.PacketCaptureManager;
@@ -48,6 +50,7 @@ public final class FancyHelper extends JavaPlugin {
     private ErrorHandler errorHandler;
     private InstructionManager instructionManager;
     private PlanManager planManager;
+    private GUIManager guiManager;
 
     @Override
     public void onEnable() {
@@ -76,10 +79,12 @@ public final class FancyHelper extends JavaPlugin {
             // 检查 ProtocolLib 依赖并初始化数据包捕获管理器
             if (getServer().getPluginManager().isPluginEnabled("ProtocolLib")) {
                 initPacketCapture();
+                // 初始化告示牌编辑器
+                org.YanPl.gui.SignEditor.init(this);
             } else {
                 getLogger().warning("==================");
                 getLogger().warning("未检测到 ProtocolLib！");
-                getLogger().warning("FancyHelper 的部分高级功能（如命令输出捕获）将无法使用。");
+                getLogger().warning("FancyHelper 的部分高级功能（如命令输出捕获、告示牌编辑）将无法使用。");
                 getLogger().warning("建议前往 https://www.spigotmc.org/resources/protocollib.1997/ 下载并安装以获得最佳体验。");
                 getLogger().warning("==================");
                 packetCaptureManager = null;
@@ -126,8 +131,12 @@ public final class FancyHelper extends JavaPlugin {
                 getLogger().severe("无法注册命令 'fancyhelper' - 请检查 plugin.yml！");
             }
 
+            // 初始化GUI管理器
+            guiManager = new GUIManager(this);
+
             // 注册事件监听器
             getServer().getPluginManager().registerEvents(new ChatListener(this), this);
+            getServer().getPluginManager().registerEvents(new GUIListener(this, guiManager), this);
 
             // bStats 统计
             int pluginId = 29036;
@@ -441,6 +450,10 @@ public final class FancyHelper extends JavaPlugin {
 
     public PlanManager getPlanManager() {
         return planManager;
+    }
+
+    public GUIManager getGuiManager() {
+        return guiManager;
     }
 
     /**
