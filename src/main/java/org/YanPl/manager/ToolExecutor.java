@@ -427,11 +427,25 @@ public class ToolExecutor {
         if (file.isDirectory()) {
             return "错误: 这是一个目录，请使用 #ls";
         }
-        if (file.length() > 1024 * 100) {
-            return "错误: 文件太大 (" + (file.length() / 1024) + "KB)，无法直接读取，请分段读取或选择其他方式";
+        if (file.length() > 1024 * 1024) {
+            return "错误: 文件过大 (" + (file.length() / 1024) + "KB)，无法读取。";
         }
 
-        return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+        StringBuilder content = new StringBuilder();
+        try (java.io.BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
+            String line;
+            int count = 0;
+            int maxLines = 500;
+            while ((line = reader.readLine()) != null) {
+                if (count >= maxLines) {
+                    content.append("\n... (内容过长，已截断显示前 " + maxLines + " 行) ...");
+                    break;
+                }
+                content.append(line).append("\n");
+                count++;
+            }
+        }
+        return content.toString();
     }
 
     /**
@@ -471,11 +485,12 @@ public class ToolExecutor {
             }
         }
 
-        if (!content.contains(search)) {
+        int index = content.indexOf(search);
+        if (index == -1) {
             return "错误: 未在文件中找到指定的查找内容，请确保查找内容完全匹配（包括缩进）";
         }
 
-        String newContent = content.replace(search, replace);
+        String newContent = content.substring(0, index) + replace + content.substring(index + search.length());
         Files.write(file.toPath(), newContent.getBytes(StandardCharsets.UTF_8));
 
         return "成功修改文件: " + path + "\n修改内容摘要：\n- 查找: " + 
@@ -488,7 +503,14 @@ public class ToolExecutor {
      */
     private boolean isWithinRoot(File root, File file) {
         try {
-            return file.getCanonicalPath().startsWith(root.getCanonicalPath());
+            String rootPath = root.getCanonicalPath();
+            String filePath = file.getCanonicalPath();
+
+            if (!rootPath.endsWith(File.separator)) {
+                rootPath += File.separator;
+            }
+
+            return filePath.equals(root.getCanonicalPath()) || filePath.startsWith(rootPath);
         } catch (IOException e) {
             return false;
         }
