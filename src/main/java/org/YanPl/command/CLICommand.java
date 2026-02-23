@@ -396,15 +396,13 @@ case "plan":
         
         player.sendMessage("");
         
-        // 4. GUI Button (Hidden as requested)
-        /*
+        // 4. GUI Button
         TextComponent guiLine = new TextComponent("      ");
         TextComponent guiBtn = new TextComponent(ColorUtil.translateCustomColors("&z[OPEN GUI MENU]"));
         guiBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli gui"));
         guiBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "Open Inventory Menu")));
         guiLine.addExtra(guiBtn);
         player.spigot().sendMessage(guiLine);
-        */
         
         player.sendMessage(ColorUtil.translateCustomColors("&8&m----------------------------------------"));
     }
