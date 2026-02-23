@@ -18,7 +18,6 @@ import org.YanPl.manager.NoticeManager;
 import org.YanPl.manager.FileWatcherManager;
 import org.YanPl.manager.InstructionManager;
 import org.YanPl.manager.PlanManager;
-import org.YanPl.manager.GuiManager;
 import org.YanPl.util.CloudErrorReport;
 import org.YanPl.util.ErrorHandler;
 import org.bstats.bukkit.Metrics;
@@ -52,7 +51,6 @@ public final class FancyHelper extends JavaPlugin {
     private InstructionManager instructionManager;
     private PlanManager planManager;
     private org.YanPl.gui.GUIManager guiManager;
-    private GuiManager guiSettingsManager;
 
     @Override
     public void onEnable() {
@@ -101,10 +99,6 @@ public final class FancyHelper extends JavaPlugin {
 
             // 初始化偏好记忆管理器
             instructionManager = new InstructionManager(this);
-
-            // 初始化 GUI 设置菜单管理器
-            guiSettingsManager = new GuiManager(this);
-            getServer().getPluginManager().registerEvents(guiSettingsManager, this);
 
             // 初始化 CLI 管理器（管理玩家的 AI 会话）
             cliManager = new CLIManager(this);
@@ -460,10 +454,6 @@ public PlanManager getPlanManager() {
 
     public org.YanPl.gui.GUIManager getGuiManager() {
         return guiManager;
-    }
-
-    public GuiManager getGuiSettingsManager() {
-        return guiSettingsManager;
     }
 
     /**

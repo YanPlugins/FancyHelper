@@ -110,8 +110,6 @@ public class CLICommand implements CommandExecutor, TabCompleter {
             case "select":
             case "exempt_anti_loop":
             case "todo":
-            case "gui":
-            case "menu":
             case "retry":
             case "stop":
             case "plan":
@@ -246,10 +244,6 @@ case "plan":
             case "view_plan":
                 plugin.getPlanManager().displayPlanBook(player);
                 return true;
-            case "gui":
-            case "menu":
-                plugin.getGuiSettingsManager().openSettingsMenu(player);
-                return true;
             case "memory":
             case "mem":
                 handleMemory(player, args);
@@ -348,63 +342,86 @@ case "plan":
     }
 
     private void handleSettings(Player player) {
-        player.sendMessage(ColorUtil.translateCustomColors("&8&m----------------------------------------"));
-        player.sendMessage(ColorUtil.translateCustomColors("       &zFancyHelper &8| &7设置"));
+        // Header
+        player.sendMessage(ColorUtil.translateCustomColors("&8&l┌────────────────────────────────────┐"));
+        player.sendMessage(ColorUtil.translateCustomColors("&8&l│ &zFancyHelper &8• &7设置面板 &8&l│"));
+        player.sendMessage(ColorUtil.translateCustomColors("&8&l└────────────────────────────────────┘"));
         player.sendMessage("");
         
-        // 1. Mode Switch
+        // 1. Mode
         boolean isYolo = plugin.getCliManager().getSession(player.getUniqueId()) != null && 
                          plugin.getCliManager().getSession(player.getUniqueId()).getMode() == org.YanPl.model.DialogueSession.Mode.YOLO;
         
-        TextComponent modeLine = new TextComponent(ColorUtil.translateCustomColors("&7  模式："));
-        TextComponent modeVal = new TextComponent(ColorUtil.translateCustomColors(isYolo ? "&cYOLO" : "&aNormal"));
-        modeLine.addExtra(modeVal);
-        modeLine.addExtra("  ");
+        TextComponent modeIcon = new TextComponent(ColorUtil.translateCustomColors(isYolo ? "&c⚡" : "&a✓"));
+        TextComponent modeLabel = new TextComponent(ColorUtil.translateCustomColors(" &7运行模式"));
+        TextComponent modeValue = new TextComponent(ColorUtil.translateCustomColors(isYolo ? " &cYOLO &8• &7激进" : " &aNormal &8• &7普通"));
+        TextComponent modeDesc = new TextComponent(ColorUtil.translateCustomColors("\n &8» " + (isYolo ? "自动执行命令" : "需要确认操作")));
         
-        TextComponent modeBtn = new TextComponent(ColorUtil.translateCustomColors("&8[ &7切换 &8]"));
-        // modeBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli " + (isYolo ? "normal" : "yolo")));
-        modeBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "不可在此处更改")));
-        modeLine.addExtra(modeBtn);
-        player.spigot().sendMessage(modeLine);
-
+        TextComponent modeBtn = new TextComponent(ColorUtil.translateCustomColors(" &8[切换]"));
+        modeBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli " + (isYolo ? "normal" : "yolo")));
+        modeBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击切换模式")));
+        
+        modeIcon.addExtra(modeLabel);
+        modeIcon.addExtra(modeValue);
+        modeIcon.addExtra(modeDesc);
+        modeIcon.addExtra(modeBtn);
+        player.spigot().sendMessage(modeIcon);
+        player.sendMessage("");
+        
         // 2. Display Position
         String displayPos = plugin.getConfigManager().getPlayerDisplayPosition(player);
-        TextComponent posLine = new TextComponent(ColorUtil.translateCustomColors("&7  显示位置：&f" + displayPos + "  "));
-        TextComponent posBtn = new TextComponent(ColorUtil.translateCustomColors("&8[ &7切换 &8]"));
-        posBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli display"));
-        posBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击切换状态显示位置 (actionbar/subtitle)")));
-        posLine.addExtra(posBtn);
-        player.spigot().sendMessage(posLine);
+        boolean isActionBar = "actionbar".equalsIgnoreCase(displayPos);
         
+        TextComponent displayIcon = new TextComponent(ColorUtil.translateCustomColors(isActionBar ? "&e📍" : "&e📄"));
+        TextComponent displayLabel = new TextComponent(ColorUtil.translateCustomColors(" &7显示位置"));
+        TextComponent displayValue = new TextComponent(ColorUtil.translateCustomColors(isActionBar ? " &eActionBar" : " &eSubtitle"));
+        TextComponent displayDesc = new TextComponent(ColorUtil.translateCustomColors("\n &8» " + (isActionBar ? "快捷栏上方" : "屏幕中央")));
+        
+        TextComponent displayBtn = new TextComponent(ColorUtil.translateCustomColors(" &8[切换]"));
+        displayBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli display"));
+        displayBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击切换显示位置")));
+        
+        displayIcon.addExtra(displayLabel);
+        displayIcon.addExtra(displayValue);
+        displayIcon.addExtra(displayDesc);
+        displayIcon.addExtra(displayBtn);
+        player.spigot().sendMessage(displayIcon);
         player.sendMessage("");
-
-        // 3. Management Buttons
-        TextComponent toolsLine = new TextComponent("  ");
         
-        TextComponent toolsBtn = new TextComponent(ColorUtil.translateCustomColors("&8[ &6工具 &8]"));
+        // Divider
+        player.sendMessage(ColorUtil.translateCustomColors("&7   ────────────────────────────"));
+        player.sendMessage("");
+        
+        // 3. Tools
+        TextComponent toolsIcon = new TextComponent(ColorUtil.translateCustomColors("&6📦"));
+        TextComponent toolsLabel = new TextComponent(ColorUtil.translateCustomColors(" &7工具权限"));
+        TextComponent toolsDesc = new TextComponent(ColorUtil.translateCustomColors("\n &8» 管理文件操作权限 (ls/read/diff)"));
+        TextComponent toolsBtn = new TextComponent(ColorUtil.translateCustomColors(" &8[管理]"));
         toolsBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli tools"));
-        toolsBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击管理文件工具权限")));
+        toolsBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击管理工具权限")));
         
-        TextComponent memBtn = new TextComponent(ColorUtil.translateCustomColors("&8[ &b记忆 &8]"));
-        memBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli memory"));
-        memBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击管理持久化记忆")));
-        
-        toolsLine.addExtra(toolsBtn);
-        toolsLine.addExtra(new TextComponent(" "));
-        toolsLine.addExtra(memBtn);
-        player.spigot().sendMessage(toolsLine);
-        
+        toolsIcon.addExtra(toolsLabel);
+        toolsIcon.addExtra(toolsDesc);
+        toolsIcon.addExtra(toolsBtn);
+        player.spigot().sendMessage(toolsIcon);
         player.sendMessage("");
         
-        // 4. GUI Button
-        TextComponent guiLine = new TextComponent("      ");
-        TextComponent guiBtn = new TextComponent(ColorUtil.translateCustomColors("&z[打开 GUI 菜单]"));
-        guiBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli gui"));
-        guiBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "打开背包菜单")));
-        guiLine.addExtra(guiBtn);
-        player.spigot().sendMessage(guiLine);
+        // 4. Memory
+        TextComponent memIcon = new TextComponent(ColorUtil.translateCustomColors("&b📝"));
+        TextComponent memLabel = new TextComponent(ColorUtil.translateCustomColors(" &7记忆管理"));
+        TextComponent memDesc = new TextComponent(ColorUtil.translateCustomColors("\n &8» 查看和管理 AI 的长期记忆"));
+        TextComponent memBtn = new TextComponent(ColorUtil.translateCustomColors(" &8[管理]"));
+        memBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli memory"));
+        memBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击管理记忆")));
         
-        player.sendMessage(ColorUtil.translateCustomColors("&8&m----------------------------------------"));
+        memIcon.addExtra(memLabel);
+        memIcon.addExtra(memDesc);
+        memIcon.addExtra(memBtn);
+        player.spigot().sendMessage(memIcon);
+        player.sendMessage("");
+        
+        // Footer
+        player.sendMessage(ColorUtil.translateCustomColors("&8   点击 &7按钮 &8进行操作"));
     }
 
     private void handleTools(Player player) {
