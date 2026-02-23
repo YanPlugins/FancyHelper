@@ -405,6 +405,8 @@ case "plan":
         memBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击管理记忆")));
         memLine.addExtra(memBtn);
         player.spigot().sendMessage(memLine);
+        
+        player.sendMessage(ColorUtil.translateCustomColors("&8&m----------------------------------------"));
     }
 
     private void handleTools(Player player) {
