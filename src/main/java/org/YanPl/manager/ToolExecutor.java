@@ -1,11 +1,19 @@
 package org.YanPl.manager;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.hover.content.Text;
 import org.YanPl.FancyHelper;
 import org.YanPl.model.DialogueSession;
+import org.YanPl.model.Question;
+import org.YanPl.model.ExecutionPlan;
+import org.YanPl.model.PlanStep;
 import org.YanPl.util.ColorUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -15,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -26,6 +35,7 @@ import java.util.UUID;
 public class ToolExecutor {
     private final FancyHelper plugin;
     private final CLIManager cliManager;
+    private final Gson gson = new Gson();
 
     public ToolExecutor(FancyHelper plugin, CLIManager cliManager) {
         this.plugin = plugin;
@@ -51,6 +61,35 @@ public class ToolExecutor {
         ToolParseResult parseResult = parseToolCall(toolCall);
         String toolName = parseResult.toolName;
         String args = parseResult.args;
+
+// PLAN 模式强制限制：只允许信息收集和计划创建工具
+        if (session != null && session.getMode() == DialogueSession.Mode.PLAN) {
+            String lowerToolName = toolName.toLowerCase();
+            // 允许的工具：#ask_questions、#create_plan、#search、#getpreset、#over、#exit
+            boolean isAllowedTool = lowerToolName.equals("#ask_questions") ||
+                                   lowerToolName.equals("#create_plan") ||
+                                   lowerToolName.equals("#search") ||
+                                   lowerToolName.equals("#getpreset") ||
+                                   lowerToolName.equals("#over") ||
+                                   lowerToolName.equals("#exit");
+
+            // 特殊限制：在PLAN模式下，如果已有计划，禁止调用#over
+            if (lowerToolName.equals("#over") && session.getCurrentPlan() != null) {
+                plugin.getLogger().warning("[CLI] PLAN 模式下阻止了#over调用：计划已创建，应等待用户选择执行模式");
+                player.sendMessage(ChatColor.RED + "⨀ 计划已创建，请等待用户选择执行模式（YOLO、Normal或Modify）");
+                cliManager.feedbackToAI(player, "#error: 计划已创建，必须等待用户选择执行模式。禁止在计划创建后立即调用#over。");
+                // 不设置生成状态为false，让feedbackToAI自动管理
+                return false;
+            }
+
+            if (!isAllowedTool) {
+                plugin.getLogger().warning("[CLI] PLAN 模式下阻止了非法工具调用: " + toolName);
+                player.sendMessage(ChatColor.RED + "⨀ PLAN 模式下只允许 #ask_questions、#create_plan、#search、#getpreset 工具");
+                cliManager.feedbackToAI(player, "#error: PLAN 模式禁止直接执行命令。允许的工具：#ask_questions、#create_plan、#search、#getpreset。禁止的工具：#run、#ls、#read、#diff、#todo、#remember、#forget、#editmem、#choose。");
+                // 不设置生成状态为false，让feedbackToAI自动管理
+                return false;
+            }
+        }
 
         if (plugin.getConfigManager().isDebug()) {
             plugin.getLogger().info("[CLI] 正在为 " + player.getName() + " 执行工具: " + toolName + " (参数: " + args + ")");
@@ -102,6 +141,12 @@ public class ToolExecutor {
                 break;
             case "#editmem":
                 handleEditmemTool(player, args);
+                break;
+            case "#ask_questions":
+                success = handleAskQuestionsTool(player, args, session);
+                break;
+            case "#create_plan":
+                success = handleCreatePlanTool(player, args, session);
                 break;
             default:
                 player.sendMessage(ChatColor.RED + "未知工具: " + toolName);
@@ -181,6 +226,10 @@ public class ToolExecutor {
             }
         } else if (lowerToolName.equals("#exit")) {
             player.sendMessage(ChatColor.GRAY + "〇 Exiting...");
+        } else if (lowerToolName.equals("#ask_questions")) {
+            player.sendMessage(ChatColor.GRAY + "⁕ " + ChatColor.WHITE + "Fancy 正在向你提问...");
+        } else if (lowerToolName.equals("#create_plan")) {
+            player.sendMessage(ChatColor.GRAY + "⁕ " + ChatColor.WHITE + "Fancy 正在制定执行计划...");
         } else if (!lowerToolName.equals("#search") && !lowerToolName.equals("#run") && 
             !lowerToolName.equals("#over") && !lowerToolName.equals("#ls") && 
             !lowerToolName.equals("#read") && !lowerToolName.equals("#todo")) {
@@ -210,7 +259,7 @@ public class ToolExecutor {
                 sendConfirmButtons(player, cleanCommand);
                 return true;
             } else {
-                player.sendMessage(ChatColor.GOLD + "⇒ YOLO RUN " + ChatColor.WHITE + cleanCommand);
+                player.sendMessage(ChatColor.GOLD + ">> YOLO RUN " + ChatColor.WHITE + cleanCommand);
                 cliManager.setGenerating(uuid, false, CLIManager.GenerationStatus.EXECUTING_TOOL);
                 executeCommand(player, cleanCommand);
                 return true;
@@ -309,7 +358,7 @@ public class ToolExecutor {
      */
     public void sendConfirmButtons(Player player, String displayAction) {
         TextComponent message = new TextComponent(displayAction != null && !displayAction.trim().isEmpty() 
-            ? (ChatColor.GRAY + "⇒ " + displayAction + " ") : "");
+            ? (ChatColor.GRAY + ">> " + ChatColor.WHITE + displayAction + " ") : "");
 
         TextComponent yBtn = new TextComponent(ChatColor.GREEN + "[ Y ]");
         yBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli confirm"));
@@ -416,7 +465,30 @@ public class ToolExecutor {
      * 执行 read 操作
      */
     private String executeReadOperation(File root, String pathArg) throws IOException {
-        File file = new File(root, pathArg);
+        String[] parts = pathArg.split("\\s+");
+        String path = parts[0];
+        int startLine = 1;
+        int endLine = -1;
+
+        if (parts.length > 1) {
+            String range = parts[1];
+            try {
+                if (range.contains("-")) {
+                    String[] rangeParts = range.split("-");
+                    if (rangeParts.length > 0 && !rangeParts[0].isEmpty()) {
+                        startLine = Integer.parseInt(rangeParts[0]);
+                    }
+                    if (rangeParts.length > 1 && !rangeParts[1].isEmpty()) {
+                        endLine = Integer.parseInt(rangeParts[1]);
+                    }
+                } else {
+                    startLine = Integer.parseInt(range);
+                    endLine = startLine; // Read single line
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+
+        File file = new File(root, path);
         
         if (!isWithinRoot(root, file)) {
             return "错误: 路径超出服务器目录限制";
@@ -427,11 +499,34 @@ public class ToolExecutor {
         if (file.isDirectory()) {
             return "错误: 这是一个目录，请使用 #ls";
         }
-        if (file.length() > 1024 * 100) {
-            return "错误: 文件太大 (" + (file.length() / 1024) + "KB)，无法直接读取，请分段读取或选择其他方式";
+        if (file.length() > 1024 * 1024) {
+            return "错误: 文件过大 (" + (file.length() / 1024) + "KB)，无法读取。";
         }
 
-        return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+        StringBuilder content = new StringBuilder();
+        try (java.io.BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
+            String line;
+            int currentLine = 1;
+            int maxLines = 500;
+            int readCount = 0;
+            
+            while ((line = reader.readLine()) != null) {
+                boolean inRange = true;
+                if (currentLine < startLine) inRange = false;
+                if (endLine != -1 && currentLine > endLine) inRange = false;
+
+                if (inRange) {
+                    if (readCount >= maxLines) {
+                        content.append("\n... (内容过长，已截断显示 " + maxLines + " 行) ...");
+                        break;
+                    }
+                    content.append(line).append("\n");
+                    readCount++;
+                }
+                currentLine++;
+            }
+        }
+        return content.toString();
     }
 
     /**
@@ -447,6 +542,21 @@ public class ToolExecutor {
         String path = diffParts[0].trim();
         String search = diffParts[1];
         String replace = diffParts[2];
+        
+        // 检查是否是行号范围模式
+        // 格式：#diff: path | 10-15 | content
+        boolean isLineMode = false;
+        int startLine = -1;
+        int endLine = -1;
+        
+        if (search.trim().matches("^\\d+-\\d+$")) {
+            try {
+                String[] range = search.trim().split("-");
+                startLine = Integer.parseInt(range[0]);
+                endLine = Integer.parseInt(range[1]);
+                isLineMode = true;
+            } catch (NumberFormatException ignored) {}
+        }
 
         File file = new File(root, path);
         
@@ -457,6 +567,45 @@ public class ToolExecutor {
             return "错误: 文件不存在";
         }
 
+        if (isLineMode) {
+            // 行号模式替换
+            List<String> lines = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8);
+            if (startLine < 1 || startLine > lines.size() + 1) { // 允许追加到末尾
+                 return "错误: 起始行号无效 (文件总行数: " + lines.size() + ")";
+            }
+            if (endLine > lines.size()) {
+                 endLine = lines.size(); // 自动修正结束行号
+            }
+            if (startLine > endLine) {
+                 // 可能是插入操作？暂时不允许反向范围
+                 return "错误: 起始行号不能大于结束行号";
+            }
+            
+            List<String> newLines = new java.util.ArrayList<>();
+            
+            // 复制前面的行
+            for (int i = 0; i < startLine - 1; i++) {
+                newLines.add(lines.get(i));
+            }
+            
+            // 插入新内容
+            if (replace != null && !replace.isEmpty()) {
+                String[] replaceLines = replace.split("\n");
+                for (String rLine : replaceLines) {
+                    newLines.add(rLine);
+                }
+            }
+            
+            // 复制后面的行
+            for (int i = endLine; i < lines.size(); i++) {
+                newLines.add(lines.get(i));
+            }
+            
+            Files.write(file.toPath(), newLines, StandardCharsets.UTF_8);
+            return "成功修改文件 (行号模式): " + path + " [" + startLine + "-" + endLine + "]";
+        }
+
+        // 原有的内容匹配模式
         String content = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
 
         // 智能处理空格
@@ -471,11 +620,12 @@ public class ToolExecutor {
             }
         }
 
-        if (!content.contains(search)) {
+        int index = content.indexOf(search);
+        if (index == -1) {
             return "错误: 未在文件中找到指定的查找内容，请确保查找内容完全匹配（包括缩进）";
         }
 
-        String newContent = content.replace(search, replace);
+        String newContent = content.substring(0, index) + replace + content.substring(index + search.length());
         Files.write(file.toPath(), newContent.getBytes(StandardCharsets.UTF_8));
 
         return "成功修改文件: " + path + "\n修改内容摘要：\n- 查找: " + 
@@ -488,7 +638,14 @@ public class ToolExecutor {
      */
     private boolean isWithinRoot(File root, File file) {
         try {
-            return file.getCanonicalPath().startsWith(root.getCanonicalPath());
+            String rootPath = root.getCanonicalPath();
+            String filePath = file.getCanonicalPath();
+
+            if (!rootPath.endsWith(File.separator)) {
+                rootPath += File.separator;
+            }
+
+            return filePath.equals(root.getCanonicalPath()) || filePath.startsWith(rootPath);
         } catch (IOException e) {
             return false;
         }
@@ -1158,5 +1315,198 @@ public class ToolExecutor {
         } catch (NumberFormatException e) {
             cliManager.feedbackToAI(player, "#editmem_result: error - 无效的序号: " + parts[0].trim());
         }
+    }
+
+    /**
+     * 处理 #ask_questions 工具
+     * 格式: #ask_questions: [{"id":"1","type":"text","text":"问题文本","required":true,"order":1}]
+     * 
+     * @param player 玩家
+     * @param args 工具参数（JSON数组）
+     * @param session 对话会话
+     * @return 是否成功
+     */
+    private boolean handleAskQuestionsTool(Player player, String args, DialogueSession session) {
+        UUID uuid = player.getUniqueId();
+        cliManager.setGenerating(uuid, false, CLIManager.GenerationStatus.EXECUTING_TOOL);
+        
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                // 解析JSON
+                JsonElement jsonElement = gson.fromJson(args, JsonElement.class);
+
+                if (jsonElement == null || !jsonElement.isJsonArray()) {
+                    plugin.getLogger().warning("[PLAN] #ask_questions JSON解析结果不是数组: " + jsonElement);
+                    String errorMsg = "#ask_questions_result: 错误: 问题数据必须是数组格式，格式如 [{\"id\":\"1\",\"type\":\"text\",\"text\":\"问题\",\"order\":1}]";
+                    feedbackErrorToMain(player, uuid, errorMsg);
+                    return;
+                }
+
+                JsonArray jsonArray = jsonElement.getAsJsonArray();
+                List<Question> questions = new ArrayList<>();
+                for (int i = 0; i < jsonArray.size(); i++) {
+                    JsonObject questionObj = jsonArray.get(i).getAsJsonObject();
+                    Question question = parseQuestion(questionObj, i + 1);
+                    questions.add(question);
+                }
+                
+                final List<Question> finalQuestions = questions;
+                if (!plugin.isEnabled()) return;
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    plugin.getPlanManager().setQuestions(player, finalQuestions);
+                    // 不向AI发送结果，让AI停止并等待用户回答问题
+                });
+            } catch (JsonSyntaxException e) {
+                plugin.getLogger().warning("[PLAN] #ask_questions JSON语法错误: " + e.getMessage() + ", 原始数据: " + args);
+                String errorMsg = "#ask_questions_result: 错误: JSON格式无效 - " + e.getMessage() + "。请确保格式为 [{\"id\":\"1\",\"type\":\"text\",\"text\":\"问题\",\"order\":1}]，options必须是数组格式如[\"选项1\",\"选项2\"]";
+                feedbackErrorToMain(player, uuid, errorMsg);
+            } catch (Exception e) {
+                plugin.getCloudErrorReport().report(e);
+                plugin.getLogger().warning("[PLAN] #ask_questions解析错误: " + e.getMessage() + ", 原始数据: " + args);
+                String errorMsg = "#ask_questions_result: 错误: 解析失败 - " + e.getMessage();
+                feedbackErrorToMain(player, uuid, errorMsg);
+            }
+        });
+        
+        return true;
+    }
+
+    /**
+     * 异步任务中反馈错误到主线程
+     */
+    private void feedbackErrorToMain(Player player, UUID uuid, String errorMsg) {
+        if (!plugin.isEnabled()) return;
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            player.sendMessage(ChatColor.RED + "⨀ " + errorMsg.replace("#ask_questions_result: ", "").replace("#create_plan_result: ", ""));
+            cliManager.feedbackToAI(player, errorMsg);
+        });
+    }
+
+    /**
+     * 处理 #create_plan 工具
+     * 格式: #create_plan: {"title":"计划标题","description":"描述","steps":[{"order":1,"description":"步骤描述"}]}
+     * 
+     * @param player 玩家
+     * @param args 工具参数（JSON对象）
+     * @param session 对话会话
+     * @return 是否成功
+     */
+    private boolean handleCreatePlanTool(Player player, String args, DialogueSession session) {
+        UUID uuid = player.getUniqueId();
+        cliManager.setGenerating(uuid, false, CLIManager.GenerationStatus.EXECUTING_TOOL);
+        
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                // 解析JSON
+                JsonObject jsonObject = gson.fromJson(args, JsonObject.class);
+
+                if (jsonObject == null || !jsonObject.has("title")) {
+                    plugin.getLogger().warning("[PLAN] #create_plan JSON缺少title字段: " + jsonObject);
+                    String errorMsg = "#create_plan_result: 错误: 计划必须包含title字段，格式如 {\"title\":\"计划标题\",\"steps\":[{\"order\":1,\"description\":\"步骤\"}]}";
+                    feedbackErrorToMain(player, uuid, errorMsg);
+                    return;
+                }
+
+                if (!jsonObject.has("steps") || !jsonObject.get("steps").isJsonArray()) {
+                    plugin.getLogger().warning("[PLAN] #create_plan JSON的steps字段不是数组: " + jsonObject);
+                    String errorMsg = "#create_plan_result: 错误: steps必须是数组格式，格式如 [{\"order\":1,\"description\":\"步骤\"}]";
+                    feedbackErrorToMain(player, uuid, errorMsg);
+                    return;
+                }
+
+                String title = jsonObject.get("title").getAsString();
+                String description = jsonObject.has("description") ? jsonObject.get("description").getAsString() : "";
+                
+                ExecutionPlan plan = new ExecutionPlan(title, description);
+                
+                JsonArray stepsArray = jsonObject.get("steps").getAsJsonArray();
+                for (int i = 0; i < stepsArray.size(); i++) {
+                    JsonObject stepObj = stepsArray.get(i).getAsJsonObject();
+                    
+                    int order;
+                    JsonElement orderElement = stepObj.get("order");
+                    if (orderElement.isJsonPrimitive() && orderElement.getAsJsonPrimitive().isNumber()) {
+                        order = orderElement.getAsInt();
+                    } else if (orderElement.isJsonPrimitive() && orderElement.getAsJsonPrimitive().isString()) {
+                        try {
+                            order = Integer.parseInt(orderElement.getAsString());
+                        } catch (NumberFormatException e) {
+                            order = i + 1; // 使用默认值
+                        }
+                    } else {
+                        order = i + 1; // 使用默认值
+                    }
+                    
+                    String stepDesc = stepObj.get("description").getAsString();
+                    String notes = stepObj.has("notes") ? stepObj.get("notes").getAsString() : "";
+                    
+                    PlanStep step = new PlanStep(order, stepDesc);
+                    step.setNotes(notes);
+                    plan.addStep(step);
+                }
+                
+                final ExecutionPlan finalPlan = plan;
+                if (!plugin.isEnabled()) return;
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    plugin.getPlanManager().createPlan(player, finalPlan);
+                    // 不向AI发送结果，让AI停止并等待用户选择执行模式
+                });
+            } catch (JsonSyntaxException e) {
+                plugin.getLogger().warning("[PLAN] #create_plan JSON语法错误: " + e.getMessage() + ", 原始数据: " + args);
+                String errorMsg = "#create_plan_result: 错误: JSON格式无效 - " + e.getMessage() + "。请确保格式为 {\"title\":\"计划标题\",\"steps\":[{\"order\":1,\"description\":\"步骤\"}]}";
+                feedbackErrorToMain(player, uuid, errorMsg);
+            } catch (Exception e) {
+                plugin.getCloudErrorReport().report(e);
+                plugin.getLogger().warning("[PLAN] #create_plan解析错误: " + e.getMessage() + ", 原始数据: " + args);
+                String errorMsg = "#create_plan_result: 错误: 解析失败 - " + e.getMessage();
+                feedbackErrorToMain(player, uuid, errorMsg);
+            }
+        });
+        
+        return true;
+    }
+
+    /**
+     * 解析问题JSON
+     * 
+     * @param obj JSON对象
+     * @param defaultOrder 默认顺序
+     * @return Question对象
+     */
+    private Question parseQuestion(JsonObject obj, int defaultOrder) {
+        String id = obj.has("id") ? obj.get("id").getAsString() : "q_" + System.currentTimeMillis();
+        String typeStr = obj.get("type").getAsString();
+        String text = obj.get("text").getAsString();
+        int order = obj.has("order") ? obj.get("order").getAsInt() : defaultOrder;
+        boolean required = !obj.has("required") || obj.get("required").getAsBoolean();
+        
+        Question.QuestionType type;
+        switch (typeStr.toLowerCase()) {
+            case "checkbox":
+                type = Question.QuestionType.CHECKBOX;
+                break;
+            case "radio":
+                type = Question.QuestionType.RADIO;
+                break;
+            case "text":
+            default:
+                type = Question.QuestionType.TEXT;
+                break;
+        }
+        
+        Question question = new Question(id, type, text, order);
+        question.setRequired(required);
+        
+        // 解析选项（如果有）
+        if (obj.has("options") && obj.get("options").isJsonArray()) {
+            JsonArray optionsArray = obj.get("options").getAsJsonArray();
+            List<String> options = new ArrayList<>();
+            for (int i = 0; i < optionsArray.size(); i++) {
+                options.add(optionsArray.get(i).getAsString());
+            }
+            question.setOptions(options);
+        }
+        
+        return question;
     }
 }
