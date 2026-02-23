@@ -42,6 +42,11 @@ public class ToolExecutor {
     public boolean executeTool(Player player, String toolCall, DialogueSession session) {
         UUID uuid = player.getUniqueId();
 
+        // 记录工具调用日志
+        if (session != null) {
+            session.appendLog("TOOL_EXECUTION", "Executing tool: " + toolCall);
+        }
+
         // 解析工具名称和参数
         ToolParseResult parseResult = parseToolCall(toolCall);
         String toolName = parseResult.toolName;
@@ -508,6 +513,8 @@ public class ToolExecutor {
                 Arrays.asList("fill", "setblock", "tp", "teleport", "give", "gamemode", 
                               "spawnpoint", "weather", "time", "msg", "tell", "w", "say", "list", "execute").contains(cmdName);
 
+            player.sendMessage(ChatColor.GRAY + "⇒ 命令已下发，等待反馈中...");
+
             boolean success;
             if (!isVanilla) {
                 try {
@@ -521,7 +528,6 @@ public class ToolExecutor {
             }
 
             boolean finalSuccess = success;
-            player.sendMessage(ChatColor.GRAY + "⇒ 命令已下发，等待反馈中...");
 
             if (!plugin.isEnabled()) return;
             Bukkit.getScheduler().runTaskLater(plugin, () -> {

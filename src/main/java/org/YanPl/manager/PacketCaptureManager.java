@@ -67,7 +67,14 @@ public class PacketCaptureManager {
                                 stripped.startsWith("⇒") || 
                                 stripped.startsWith("◇") || 
                                 stripped.startsWith("◆") || 
-                                stripped.contains("FancyHelper")) {
+                                stripped.contains("FancyHelper") ||
+                                stripped.equals("....") ||
+                                stripped.equals("- ✓ -") ||
+                                stripped.equals("- ✕ -") ||
+                                stripped.equals("- ERROR -") ||
+                                stripped.equals("正在征求您的许可...") ||
+                                stripped.equals("正在征求您的意见...") ||
+                                stripped.matches("^- 思考中 \\d+s -$")) {
                                 return;
                             }
 

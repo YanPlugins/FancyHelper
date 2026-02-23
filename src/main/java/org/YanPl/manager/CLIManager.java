@@ -585,6 +585,11 @@ public class CLIManager {
 
     public void handleConfirm(Player player) {
         UUID uuid = player.getUniqueId();
+        DialogueSession session = sessions.get(uuid);
+        if (session != null && pendingCommands.containsKey(uuid)) {
+            session.appendLog("USER_ACTION", "Confirmed command: " + pendingCommands.get(uuid));
+        }
+
         if (pendingCommands.containsKey(uuid)) {
             String cmd = pendingCommands.get(uuid);
             if (!"CHOOSING".equals(cmd)) {
@@ -623,6 +628,11 @@ public class CLIManager {
 
     public void handleCancel(Player player) {
         UUID uuid = player.getUniqueId();
+        DialogueSession session = sessions.get(uuid);
+        if (session != null && pendingCommands.containsKey(uuid)) {
+            session.appendLog("USER_ACTION", "Cancelled command: " + pendingCommands.get(uuid));
+        }
+
         if (pendingCommands.containsKey(uuid)) {
             pendingCommands.remove(uuid);
             player.sendMessage(ChatColor.GRAY + "⇒ 命令已取消");
@@ -784,6 +794,11 @@ public class CLIManager {
      */
     public void handleRetry(Player player) {
         UUID uuid = player.getUniqueId();
+        DialogueSession session = sessions.get(uuid);
+        if (session != null) {
+            session.appendLog("USER_ACTION", "Retrying AI call");
+        }
+        
         RetryInfo retryInfo = retryInfoMap.get(uuid);
         if (retryInfo == null) {
             player.sendMessage(ChatColor.GRAY + "没有可重试的操作。");
@@ -875,6 +890,9 @@ public class CLIManager {
         interruptedToolCalls.remove(uuid);
         DialogueSession session = sessions.get(uuid);
         if (session == null) return;
+
+        // 记录用户消息
+        session.appendLog("USER_INPUT", message);
 
         session.addMessage("user", message);
         isGenerating.put(uuid, true);
