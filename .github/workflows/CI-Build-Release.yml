@@ -179,23 +179,32 @@ jobs:
             PRS=""
           fi
 
-          # 构建提示词
-          {
-            echo "请根据以下变更内容为 FancyHelper Minecraft 插件生成发行说明的 Overview 部分。"
-            echo "要求："
-            echo "1. 使用 Markdown 格式"
-            echo "2. 保持简洁专业"
-            echo "3. 突出重要变更"
-            echo "4. 使用中文"
-            echo ""
-            echo "版本：v$VERSION"
-            echo ""
-            echo "PR 变更："
-            echo "$PRS"
-            echo ""
-            echo "Commit 变更："
-            echo "$COMMITS"
-          } > /tmp/prompt.txt
+          # 构建 prompt 并写入文件
+          echo "你是一个专业的版本发布助手。请根据以下 Pull Request 和 Commit 信息，为 FancyHelper Minecraft 插件生成中文的发行注记 Overview。" > /tmp/prompt.txt
+          echo "" >> /tmp/prompt.txt
+          echo "版本号：v$VERSION" >> /tmp/prompt.txt
+          echo "" >> /tmp/prompt.txt
+          echo "PR 列表:" >> /tmp/prompt.txt
+          echo "$PRS" >> /tmp/prompt.txt
+          echo "" >> /tmp/prompt.txt
+          echo "Commit 列表:" >> /tmp/prompt.txt
+          echo "$COMMITS" >> /tmp/prompt.txt
+          echo "" >> /tmp/prompt.txt
+          echo "要求：" >> /tmp/prompt.txt
+          echo "1. 用中文撰写" >> /tmp/prompt.txt
+          echo "2. 必须使用以下格式（严格遵守）：" >> /tmp/prompt.txt
+          echo "   ## Overview" >> /tmp/prompt.txt
+          echo "   * 第一条变更说明" >> /tmp/prompt.txt
+          echo "   * 第二条变更说明" >> /tmp/prompt.txt
+          echo "   * 第三条变更说明" >> /tmp/prompt.txt
+          echo "3. 每条变更必须以 \"* \" 开头（星号 + 空格），不要使用其他符号" >> /tmp/prompt.txt
+          echo "4. 简洁明了，每条控制在 10-30 字" >> /tmp/prompt.txt
+          echo "5. 突出主要功能更新、bug 修复和重要改动" >> /tmp/prompt.txt
+          echo "6. 不要添加 emoji" >> /tmp/prompt.txt
+          echo "7. 直接输出内容，不要有开场白" >> /tmp/prompt.txt
+          echo "8. 总条目控制在 3-6 条" >> /tmp/prompt.txt
+          echo "" >> /tmp/prompt.txt
+          echo "请生成发行注记 Overview：" >> /tmp/prompt.txt
 
           # 获取 Cloudflare Account ID
           ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID}"
