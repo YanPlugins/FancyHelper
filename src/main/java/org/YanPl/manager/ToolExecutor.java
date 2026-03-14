@@ -660,21 +660,13 @@ public class ToolExecutor {
             String cmdName = command.split(" ")[0].toLowerCase();
             if (cmdName.startsWith("/")) cmdName = cmdName.substring(1);
 
-            boolean isVanilla = cmdName.startsWith("minecraft:") || 
-                Arrays.asList("fill", "setblock", "tp", "teleport", "give", "gamemode", 
-                              "spawnpoint", "weather", "time", "msg", "tell", "w", "say", "list", "execute").contains(cmdName);
-
             player.sendMessage(ChatColor.GRAY + "⇒ 命令已下发，等待反馈中...");
 
             boolean success;
-            if (!isVanilla) {
-                try {
-                    org.bukkit.command.CommandSender interceptor = createInterceptor(player, output);
-                    success = Bukkit.dispatchCommand(interceptor, command);
-                } catch (Throwable t) {
-                    success = player.performCommand(command);
-                }
-            } else {
+            try {
+                org.bukkit.command.CommandSender interceptor = createInterceptor(player, output);
+                success = Bukkit.dispatchCommand(interceptor, command);
+            } catch (Throwable t) {
                 success = player.performCommand(command);
             }
 
@@ -700,7 +692,14 @@ public class ToolExecutor {
                 if (hasOutput || !finalSuccess) {
                     String finalPacketOutput = "";
                     if (plugin.getPacketCaptureManager() != null) {
-                        finalPacketOutput = plugin.getPacketCaptureManager().stopCapture(player);
+                        // 如果拦截器已有输出，则忽略数据包捕获的输出，避免广播消息污染
+                        if (!currentProxyOutput.isEmpty()) {
+                            // 停止捕获但丢弃输出
+                            plugin.getPacketCaptureManager().stopCapture(player);
+                            finalPacketOutput = "";
+                        } else {
+                            finalPacketOutput = plugin.getPacketCaptureManager().stopCapture(player);
+                        }
                     }
                     String finalResult = buildCommandResult(command, finalPacketOutput, currentProxyOutput, finalSuccess);
                     player.sendMessage(ChatColor.GRAY + "⇒ 反馈已发送至 Fancy");
@@ -730,11 +729,11 @@ public class ToolExecutor {
      * 构建命令执行结果
      */
     private String buildCommandResult(String command, String packetOutput, String proxyOutput, boolean success) {
-        if (!packetOutput.isEmpty()) {
-            return packetOutput;
-        }
         if (!proxyOutput.isEmpty()) {
             return proxyOutput;
+        }
+        if (!packetOutput.isEmpty()) {
+            return packetOutput;
         }
         if (success) {
             if (command.toLowerCase().startsWith("tp")) {
