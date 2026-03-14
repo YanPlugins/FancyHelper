@@ -270,7 +270,6 @@ public class CloudFlareAI {
 
         // 如果 API 地址不包含 /chat/completions，尝试自动补全（针对 OpenAI 兼容 API）
         if (!apiUrl.contains("/chat/completions")) {
-            String originalUrl = apiUrl;
             // 针对阿里云通义千问的特殊处理
             if (apiUrl.contains("aliyuncs.com")) {
                 if (apiUrl.endsWith("/")) {
