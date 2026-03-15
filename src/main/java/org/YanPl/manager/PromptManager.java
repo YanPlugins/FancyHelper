@@ -148,6 +148,13 @@ public class PromptManager {
         sb.append("  #end - Task completion marker. **Must be at end of response, with a summary to player before it. NEVER call it alone.**\n");
         sb.append("  #exit - Call when user wants to exit FancyHelper.\n\n");
         
+        sb.append("**IMPORTANT: When you need to execute any Minecraft command, you MUST use the #run tool.**\n");
+        sb.append("  - You CANNOT directly output commands in your response text.\n");
+        sb.append("  - You MUST wrap all commands with #run: <command> format.\n");
+        sb.append("  - Example: To give player an apple, write: #run: give @p apple\n");
+        sb.append("  - Example: To set time to day, write: #run: time set day\n");
+        sb.append("  - Example: To teleport player, write: #run: tp @p 100 64 100\n\n");
+        
         // 【文件类工具】（以下工具的执行结果玩家不可见）
         // #list: <path> - 列出目录内容。如 #list: plugins/FancyHelper
         // #read: <path> - 读取文件内容。如 #read: plugins/FancyHelper/config.yml
