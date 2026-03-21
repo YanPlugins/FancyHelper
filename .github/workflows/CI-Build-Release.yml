@@ -2,10 +2,6 @@ name: CI-Build & Release
 
 #！！！不要把FancyHelper改成fancyhelper
 
-# 需要配置以下 secrets：
-# 1. CLOUDFLARE_R2_TOKEN - 用于上传到 R2 存储，需要 R2 存储权限
-# 2. CLOUDFLARE_API_KEY - 用于调用 Workers AI，需要 Workers AI 权限
-# 3. CLOUDFLARE_ACCOUNT_ID - Cloudflare 账户 ID
 
 on:
   push:
@@ -153,7 +149,7 @@ jobs:
           path: target/FancyHelper-*.jar
 
   # ==================== 上传到 Cloudflare R2 构建站 ====================
-  # 需要配置 CLOUDFLARE_R2_TOKEN 密钥，该密钥需要有 R2 存储权限
+  # 通过 Worker API 上传，需要配置 BUILDS_KEY 密钥
   upload-r2:
     name: 上传到构建站
     runs-on: ubuntu-latest
@@ -169,13 +165,10 @@ jobs:
           path: artifacts/
           merge-multiple: true
 
-      - name: 安装 Wrangler
-        run: npm install -g wrangler
-
-      - name: 确定上传路径并上传到 R2
+      - name: 通过 Worker API 上传到 R2
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_R2_TOKEN }}  # 需要R2存储权限
-          CLOUDFLARE_ACCOUNT_ID: "867520dfa43947e67f0416d72989a2af"
+          BUILDS_KEY: ${{ secrets.BUILDS_KEY }}
+          WORKER_URL: ${{ secrets.WORKER_URL }}
         run: |
           IS_RELEASE="${{ needs.build.outputs.IS_RELEASE }}"
           VERSION="${{ needs.build.outputs.RELEASE_VERSION }}"
@@ -194,10 +187,25 @@ jobs:
               FILENAME=$(basename "$jar")
               R2_KEY="${UPLOAD_DIR}/${FILENAME}"
               echo "上传 ${FILENAME} -> ${R2_KEY}"
-              wrangler r2 object put "fancyhelper-builds/${R2_KEY}" \
-                --file="$jar" \
-                --content-type="application/java-archive"
-              echo "上传完成: ${R2_KEY}"
+              
+              # 通过 Worker API 上传
+              RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+                "${WORKER_URL}?path=${R2_KEY}" \
+                -H "X-Builds-Key: ${BUILDS_KEY}" \
+                -H "Content-Type: application/java-archive" \
+                --data-binary "@${jar}")
+              
+              HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+              BODY=$(echo "$RESPONSE" | head -n-1)
+              
+              if [[ "$HTTP_CODE" == "200" ]]; then
+                echo "上传成功: ${R2_KEY}"
+                echo "$BODY" | jq '.' 2>/dev/null || echo "$BODY"
+              else
+                echo "上传失败: HTTP ${HTTP_CODE}"
+                echo "$BODY"
+                exit 1
+              fi
             fi
           done
 
