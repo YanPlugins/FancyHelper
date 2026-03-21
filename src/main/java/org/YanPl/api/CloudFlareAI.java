@@ -1,7 +1,6 @@
 package org.YanPl.api;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -91,8 +90,6 @@ public class CloudFlareAI {
         
         try {
             StringBuilder sb = new StringBuilder();
-            Gson prettyGson = new GsonBuilder().setPrettyPrinting().create();
-            
             if (isDebug || session.isVerboseLogging()) {
                 // 调试模式或详细日志模式下记录完整信息（但已优化）
                 try {

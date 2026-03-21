@@ -201,7 +201,8 @@ public class ToolExecutor {
             player.sendMessage(ChatColor.GRAY + "〇 Exiting...");
         } else if (!lowerToolName.equals("#search") && !lowerToolName.equals("#run") && 
             !lowerToolName.equals("#end") && !lowerToolName.equals("#list") && 
-            !lowerToolName.equals("#read") && !lowerToolName.equals("#todo")) {
+            !lowerToolName.equals("#read") && !lowerToolName.equals("#todo") &&
+            !lowerToolName.equals("#getpreset")) {
             player.sendMessage(ChatColor.GRAY + "〇 " + toolName);
         }
     }
@@ -304,10 +305,10 @@ public class ToolExecutor {
             } catch (Exception ignored) {}
         }
 
-        // YOLO 模式下直接执行
-        if (session != null && session.getMode() == DialogueSession.Mode.YOLO) {
-            String actionDesc = type.equals("ls") ? "LIST" : (type.equals("read") ? "READ" : "EDIT");
-            player.sendMessage(ChatColor.GOLD + "⇒ YOLO " + actionDesc + " " + ChatColor.WHITE + args);
+        // #ls 和 #read 不需要确认，直接执行
+        if ("ls".equals(type) || "read".equals(type)) {
+            String actionDesc = type.equals("ls") ? "LIST" : "READ";
+            player.sendMessage(ChatColor.GOLD + ">> " + actionDesc + " " + ChatColor.WHITE + args);
 
             // 检查是否被冻结
             long freezeRemaining = plugin.getVerificationManager().getPlayerFreezeRemaining(player);
@@ -316,12 +317,12 @@ public class ToolExecutor {
                 return;
             }
 
-            // YOLO 模式下也需要检查权限开启
+            // 检查权限开启
             if (plugin.getConfigManager().isPlayerToolEnabled(player, type)) {
                 cliManager.setGenerating(uuid, false, CLIManager.GenerationStatus.EXECUTING_TOOL);
                 executeFileOperation(player, type, args);
             } else {
-                player.sendMessage(ChatColor.YELLOW + "检测到 YOLO 模式调用 " + type + "，但该工具尚未完成首次验证。");
+                player.sendMessage(ChatColor.YELLOW + "检测到调用 " + type + "，但该工具尚未完成首次验证。");
                 plugin.getVerificationManager().startVerification(player, type, () -> {
                     plugin.getConfigManager().setPlayerToolEnabled(player, type, true);
                     cliManager.setGenerating(uuid, false, CLIManager.GenerationStatus.EXECUTING_TOOL);
@@ -331,17 +332,11 @@ public class ToolExecutor {
             return;
         }
 
-        // 普通模式需要确认
+        // #edit (diff) 需要确认
         String pendingStr = type.toUpperCase() + ":" + args;
         cliManager.setPendingCommand(uuid, pendingStr);
         cliManager.setGenerating(uuid, false, CLIManager.GenerationStatus.WAITING_CONFIRM);
-
-        if ("diff".equals(type)) {
-            sendConfirmButtons(player, "");
-        } else {
-            String actionDesc = type.equals("ls") ? "请求列出目录" : "请求读取文件";
-            sendConfirmButtons(player, actionDesc + " " + ChatColor.WHITE + args);
-        }
+        sendConfirmButtons(player, "");
     }
 
     /**
@@ -942,6 +937,8 @@ public class ToolExecutor {
      * 处理 #getpreset 工具
      */
     private void handleGetTool(Player player, String fileName) {
+        // 显示正在读取预设的信息
+        player.sendMessage(ChatColor.GRAY + "〇 正在读取预设...");
         cliManager.setGenerating(player.getUniqueId(), false, CLIManager.GenerationStatus.EXECUTING_TOOL);
         
         File presetFile = new File(plugin.getDataFolder(), "preset/" + fileName);
