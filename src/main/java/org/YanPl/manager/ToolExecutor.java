@@ -335,7 +335,10 @@ public class ToolExecutor {
         String pendingStr = type.toUpperCase() + ":" + args;
         cliManager.setPendingCommand(uuid, pendingStr);
         cliManager.setGenerating(uuid, false, CLIManager.GenerationStatus.WAITING_CONFIRM);
-        sendConfirmButtons(player, "");
+        
+        // 为 #edit 工具提供操作描述
+        String actionDesc = "请求修改文件";
+        sendConfirmButtons(player, actionDesc + " " + ChatColor.WHITE + args);
     }
 
     /**
