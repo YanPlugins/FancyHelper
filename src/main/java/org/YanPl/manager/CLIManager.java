@@ -713,6 +713,18 @@ public class CLIManager {
         
         player.sendMessage(ChatColor.WHITE + "⁕ " + ChatColor.GRAY + "检测到风险操作，是否继续？");
         
+        ChatColor riskColor;
+        if (assessment.level < 25) {
+            riskColor = ChatColor.GREEN;
+        } else if (assessment.level < 50) {
+            riskColor = ChatColor.YELLOW;
+        } else if (assessment.level < 75) {
+            riskColor = ChatColor.GOLD;
+        } else {
+            riskColor = ChatColor.RED;
+        }
+        player.sendMessage(ChatColor.WHITE + "  风险值: " + riskColor + assessment.level + "/100");
+        
         if ("run".equals(actionType)) {
             player.sendMessage(ChatColor.WHITE + "  运行命令 " + ChatColor.YELLOW + actionContent);
         } else if ("edit".equals(actionType)) {
@@ -731,19 +743,19 @@ public class CLIManager {
         
         TextComponent message = new TextComponent("");
         
-        TextComponent allowBtn = new TextComponent(ChatColor.GREEN + "[本次允许]");
+        TextComponent allowBtn = new TextComponent(ChatColor.GREEN + "[ ✓ ]");
         allowBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli smart_allow"));
         allowBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text("允许本次操作")));
         
         TextComponent spacer1 = new TextComponent(" ");
         
-        TextComponent denyBtn = new TextComponent(ChatColor.RED + "[拒绝]");
+        TextComponent denyBtn = new TextComponent(ChatColor.RED + "[ ✕ ]");
         denyBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli smart_deny"));
         denyBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text("拒绝此操作")));
         
         TextComponent spacer2 = new TextComponent(" ");
         
-        TextComponent neverAskBtn = new TextComponent(ChatColor.AQUA + "[不再询问]");
+        TextComponent neverAskBtn = new TextComponent(ChatColor.GRAY + "[ 不再询问 ]");
         neverAskBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli smart_never"));
         neverAskBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text("允许本次操作并不再询问")));
         
