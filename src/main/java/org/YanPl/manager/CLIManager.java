@@ -872,11 +872,8 @@ public class CLIManager {
         
         pendingSmartActions.remove(uuid);
         
-        DialogueSession session = sessions.get(uuid);
-        if (session != null) {
-            session.setMode(DialogueSession.Mode.YOLO);
-            player.sendMessage(ChatColor.GRAY + "⇒ 已临时切换到 YOLO 模式，本次会话内不再询问");
-        }
+        // 显式切换到 YOLO 模式
+        switchMode(player, DialogueSession.Mode.YOLO);
         
         executeSmartAction(player, action);
     }
@@ -1963,17 +1960,17 @@ public class CLIManager {
         
         TextComponent message = new TextComponent(ChatColor.WHITE + "Chatting with Fancy ");
         
+        TextComponent modeTag;
         if (mode == DialogueSession.Mode.NORMAL) {
-            TextComponent modeTag = new TextComponent(ChatColor.GREEN + " (Normal) ");
-            modeTag.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GOLD + "点击进入 YOLO 模式")));
-            modeTag.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli yolo"));
-            message.addExtra(modeTag);
+            modeTag = new TextComponent(ChatColor.GREEN + " (Normal) ");
+        } else if (mode == DialogueSession.Mode.SMART) {
+            modeTag = new TextComponent(ChatColor.BLUE + " (SMART) ");
         } else {
-            TextComponent modeTag = new TextComponent(ChatColor.RED + " (YOLO) ");
-            modeTag.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GREEN + "点击回到 Normal 模式")));
-            modeTag.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli normal"));
-            message.addExtra(modeTag);
+            modeTag = new TextComponent(ChatColor.RED + " (YOLO) ");
         }
+        modeTag.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text("点击选择模式")));
+        modeTag.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli gui mode"));
+        message.addExtra(modeTag);
 
         TextComponent settingsBtn = new TextComponent(ChatColor.GRAY + "[Settings]");
         settingsBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GRAY + "点击打开工具设置")));

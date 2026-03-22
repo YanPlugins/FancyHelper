@@ -248,7 +248,16 @@ public class CLICommand implements CommandExecutor, TabCompleter {
                 return true;
             case "gui":
             case "menu":
-                plugin.getGuiManager().openSettingsMenu(player);
+                if (args.length > 1) {
+                    String subMenu = args[1];
+                    if ("mode".equalsIgnoreCase(subMenu)) {
+                        plugin.getGuiManager().openModeSelectionMenu(player);
+                    } else {
+                        plugin.getGuiManager().openSettingsMenu(player);
+                    }
+                } else {
+                    plugin.getGuiManager().openSettingsMenu(player);
+                }
                 return true;
             case "memory":
             case "mem":
