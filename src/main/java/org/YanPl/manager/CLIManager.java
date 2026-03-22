@@ -741,7 +741,7 @@ public class CLIManager {
             player.sendMessage(ChatColor.WHITE + "  原因 " + ChatColor.GRAY + assessment.reason);
         }
         
-        TextComponent message = new TextComponent("");
+        TextComponent message = new TextComponent("  ");
         
         TextComponent allowBtn = new TextComponent(ChatColor.GREEN + "[ ✓ ]");
         allowBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli smart_allow"));
