@@ -230,7 +230,7 @@ jobs:
         id: ai_gen
         env:
           CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}  # 需要Workers AI权限
-          CLOUDFLARE_ACCOUNT_ID: "867520dfa43947e67f0416d72989a2af"
+          CLOUDFLARE_ACCOUNT_ID: "70032e1e52c2d1a525a431169c4a86c7"
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.build.outputs.RELEASE_VERSION }}
         run: |
