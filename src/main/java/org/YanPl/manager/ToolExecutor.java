@@ -1069,7 +1069,7 @@ public class ToolExecutor {
         } else if (plugin.getConfigManager().isTavilyEnabled()) {
             return plugin.getTavilyAPI().search(q);
         }
-        return fetchPublicSearchResult(q);
+        return "搜索服务不可用，请在配置文件中启用 Metaso API 或 Tavily API。";
     }
 
     /**
@@ -1089,7 +1089,7 @@ public class ToolExecutor {
             } else if (plugin.getConfigManager().isTavilyEnabled()) {
                 return plugin.getTavilyAPI().search(query);
             }
-            return fetchPublicSearchResult(query);
+            return "搜索服务不可用，请在配置文件中启用 Metaso API 或 Tavily API。";
         }
         return result;
     }
@@ -1147,55 +1147,7 @@ public class ToolExecutor {
         return "未找到相关 Wiki 条目。";
     }
 
-    /**
-     * 调用公开搜索接口
-     */
-    private String fetchPublicSearchResult(String query) {
-        try {
-            String url = "https://uapis.cn/api/v1/search/aggregate";
 
-            com.google.gson.JsonObject bodyJson = new com.google.gson.JsonObject();
-            bodyJson.addProperty("query", query);
-
-            java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
-                    .connectTimeout(java.time.Duration.ofSeconds(10))
-                    .build();
-
-            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
-                    .uri(java.net.URI.create(url))
-                    .header("User-Agent", "FancyHelper/1.0")
-                    .header("Content-Type", "application/json; charset=utf-8")
-                    .timeout(java.time.Duration.ofSeconds(10))
-                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(bodyJson.toString()))
-                    .build();
-
-            java.net.http.HttpResponse<String> response = httpClient.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() == 200) {
-                com.google.gson.JsonArray results = extractResultsArray(response.body());
-                
-                if (results != null && results.size() > 0) {
-                    StringBuilder sb = new StringBuilder("全网搜索结果 (" + query + ")：\n");
-                    for (int i = 0; i < Math.min(5, results.size()); i++) {
-                        com.google.gson.JsonObject item = results.get(i).getAsJsonObject();
-                        String title = getStringField(item, "title", "无标题");
-                        String content = getStringField(item, "content", "snippet", "abstract");
-                        
-                        if (content.length() > 500) {
-                            content = content.substring(0, 500) + "...";
-                        }
-                        sb.append("- ").append(title).append(": ").append(content).append("\n");
-                    }
-                    return sb.toString();
-                }
-            } else {
-                plugin.getLogger().warning("UAPI 搜索失败: " + response.statusCode());
-            }
-        } catch (Exception e) {
-            return "全网搜索出错: " + e.getMessage();
-        }
-        return "未找到相关全网搜索结果。";
-    }
 
     /**
      * 从 JSON 响应中提取结果数组
@@ -1386,8 +1338,6 @@ public class ToolExecutor {
         
         // 再次修剪空格
         url = url.trim();
-        
-        player.sendMessage(ChatColor.GRAY + "〇 正在读取网页: " + ChatColor.WHITE + url);
 
         // 直接执行网页阅读，不需要验证
         executeWebReader(player, url);

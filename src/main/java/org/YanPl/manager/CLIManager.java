@@ -637,24 +637,25 @@ public class CLIManager {
      * @return 恢复的对话会话，null如果没有有效的历史记录
      */
     public DialogueSession loadSessionHistory(UUID uuid) {
+        Path historyFile = null;
         try {
             // 检查历史记录目录
             Path historyDir = plugin.getDataFolder().toPath().resolve("temp").resolve("history");
             if (!Files.exists(historyDir)) {
                 return null;
             }
-            
+
             // 检查历史文件
-            Path historyFile = historyDir.resolve(uuid.toString() + ".json");
+            historyFile = historyDir.resolve(uuid.toString() + ".json");
             if (!Files.exists(historyFile)) {
                 return null;
             }
-            
+
             // 读取并解析JSON
             Gson gson = new Gson();
             String json = Files.readString(historyFile, StandardCharsets.UTF_8);
             Map<String, Object> sessionData = gson.fromJson(json, new TypeToken<Map<String, Object>>(){}.getType());
-            
+
             // 检查时间戳
             Object timestampObj = sessionData.getOrDefault("timestamp", 0);
             long timestamp;
@@ -669,16 +670,16 @@ public class CLIManager {
             }
             long now = System.currentTimeMillis();
             long thirtyMinutesMs = 30 * 60 * 1000;
-            
+
             if (now - timestamp > thirtyMinutesMs) {
                 // 超过30分钟，删除过期文件
                 Files.deleteIfExists(historyFile);
                 return null;
             }
-            
+
             // 创建新会话并恢复数据
             DialogueSession session = new DialogueSession();
-            
+
             // 恢复对话模式
             String modeStr = (String) sessionData.getOrDefault("mode", "NORMAL");
             try {
@@ -688,7 +689,7 @@ public class CLIManager {
                 // 模式解析失败，使用默认模式
                 session.setMode(DialogueSession.Mode.NORMAL);
             }
-            
+
             // 恢复对话历史
             Object messagesObj = sessionData.getOrDefault("messages", new ArrayList<>());
             if (messagesObj instanceof List<?>) {
@@ -706,7 +707,7 @@ public class CLIManager {
                     }
                 }
             }
-            
+
             // 恢复工具调用历史
             Object toolCallsObj = sessionData.getOrDefault("toolCalls", new ArrayList<>());
             if (toolCallsObj instanceof List<?>) {
@@ -717,19 +718,25 @@ public class CLIManager {
                     }
                 }
             }
-            
-            // 删除已加载的历史文件
-            Files.deleteIfExists(historyFile);
-            
+
             if (plugin.getConfigManager().isDebug()) {
                 plugin.getLogger().info("[CLI] 已加载会话历史: " + historyFile.getFileName());
             }
-            
+
             return session;
         } catch (Exception e) {
             plugin.getLogger().warning("[CLI] 加载会话历史失败: " + e.getMessage());
             plugin.getCloudErrorReport().report(e);
             return null;
+        } finally {
+            // 确保历史文件被删除
+            if (historyFile != null) {
+                try {
+                    Files.deleteIfExists(historyFile);
+                } catch (IOException e) {
+                    plugin.getLogger().warning("[CLI] 删除历史文件失败: " + e.getMessage());
+                }
+            }
         }
     }
 
@@ -738,16 +745,19 @@ public class CLIManager {
      * @param player 玩家
      */
     public void sendUnloadMessage(Player player) {
-        // 创建主消息
-        TextComponent message = new TextComponent(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f与Fancy的会话已被挂起 "));
-        
+        // 创建主消息 - 使用fromLegacyText正确解析颜色代码
+        net.md_5.bungee.api.chat.BaseComponent[] components = net.md_5.bungee.api.chat.TextComponent.fromLegacyText(
+            ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f与Fancy的会话已被挂起 ")
+        );
+        TextComponent message = new TextComponent(components);
+
         // 创建了解更多按钮
         TextComponent learnMoreBtn = new TextComponent("[了解更多]");
         learnMoreBtn.setColor(net.md_5.bungee.api.ChatColor.BLUE);
         learnMoreBtn.setUnderlined(true);
         learnMoreBtn.setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, "https://deepwiki.com/baicaizhale/Fancyhelper"));
         learnMoreBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text("点击打开 FancyHelper 帮助页面")));
-        
+
         message.addExtra(learnMoreBtn);
         player.spigot().sendMessage(message);
     }
@@ -1855,7 +1865,11 @@ public class CLIManager {
                     // 仍然显示本次工具调用
                     String toolName = toolCall.split(":", 2)[0];
                     String args = toolCall.contains(":") ? toolCall.split(":", 2)[1] : "";
-                    player.sendMessage(ChatColor.GOLD + "⇒ Fancy 尝试调用: " + ChatColor.WHITE + toolName + (args.isEmpty() ? "" : " " + args));
+                    if ("#webread".equals(toolName)) {
+                        player.sendMessage(ChatColor.GOLD + "⇒ Fancy 尝试调用: " + ChatColor.WHITE + args.trim());
+                    } else {
+                        player.sendMessage(ChatColor.GOLD + "⇒ Fancy 尝试调用: " + ChatColor.WHITE + toolName + (args.isEmpty() ? "" : " " + args));
+                    }
 
                     player.sendMessage(ChatColor.RED + "⨀ 检测到 Fancy 可能陷入了重复操作的死循环。");
                     
@@ -1883,7 +1897,11 @@ public class CLIManager {
                 // 仍然显示本次工具调用
                 String toolName = toolCall.split(":", 2)[0];
                 String args = toolCall.contains(":") ? toolCall.split(":", 2)[1] : "";
-                player.sendMessage(ChatColor.GOLD + "⇒ Fancy 尝试调用: " + ChatColor.WHITE + toolName + (args.isEmpty() ? "" : " " + args));
+                if ("#webread".equals(toolName)) {
+                    player.sendMessage(ChatColor.GOLD + "⇒ Fancy 尝试调用: " + ChatColor.WHITE + args.trim());
+                } else {
+                    player.sendMessage(ChatColor.GOLD + "⇒ Fancy 尝试调用: " + ChatColor.WHITE + toolName + (args.isEmpty() ? "" : " " + args));
+                }
 
                 player.sendMessage(ChatColor.YELLOW + "⨀ 识别到Fancy重复调用" + maxChainCount + "次相似操作，请优化提示词。");
                 
