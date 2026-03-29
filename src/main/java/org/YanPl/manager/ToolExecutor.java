@@ -210,7 +210,8 @@ public class ToolExecutor {
         } else if (!lowerToolName.equals("#search") && !lowerToolName.equals("#run") && 
             !lowerToolName.equals("#end") && !lowerToolName.equals("#list") && 
             !lowerToolName.equals("#read") && !lowerToolName.equals("#todo") &&
-            !lowerToolName.equals("#getpreset")) {
+            !lowerToolName.equals("#getpreset") && !lowerToolName.equals("#webread")) {
+            // 对 #webread 隐藏此显示，因为 #webread 会在 executeWebReader 中显示更详细的信息
             player.sendMessage(ChatColor.GRAY + "〇 " + toolName);
         }
     }
@@ -517,6 +518,7 @@ public class ToolExecutor {
 
     /**
      * 执行 read 操作
+     * 返回带行号的内容，方便 AI 知道每行对应的行号
      */
     private String executeReadOperation(File root, String pathArg) throws IOException {
         String[] parts = pathArg.split("\\s+");
@@ -561,7 +563,7 @@ public class ToolExecutor {
         try (java.io.BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
             String line;
             int currentLine = 1;
-            int maxLines = 500;
+            int maxLines = 2000;
             int readCount = 0;
             
             while ((line = reader.readLine()) != null) {
@@ -574,7 +576,8 @@ public class ToolExecutor {
                         content.append("\n... (内容过长，已截断显示 " + maxLines + " 行) ...");
                         break;
                     }
-                    content.append(line).append("\n");
+                    // 添加行号前缀，格式：行号: 内容
+                    content.append(currentLine).append(": ").append(line).append("\n");
                     readCount++;
                 }
                 currentLine++;
@@ -586,42 +589,68 @@ public class ToolExecutor {
     /**
      * 执行 edit 操作
      * 在给定行号范围内查找旧内容，如果找到多个匹配则拒绝操作
+     * 支持自动搜索模式：range 可以是 "auto" 或省略（使用 "auto"）
      */
     private String executeDiffOperation(File root, String pathArg) throws IOException {
         String[] editParts = pathArg.split("\\|", 4);
         
-        if (editParts.length < 4) {
-            return "错误: #edit 需要提供4个参数，格式：#edit: path | range | original | replacement";
-        }
-
-        String path = editParts[0].trim();
-        String rangeStr = editParts[1].trim();
-        String original = editParts[2];
-        String replacement = editParts[3];
+        // 支持3种格式：
+        // 1. path|range|original|replacement (4部分，带行号)
+        // 2. path|original|replacement (3部分，自动搜索)
+        // 3. path|auto|original|replacement (4部分，但range是auto)
         
-        // 解析行号范围（支持单行格式如 "10" 或范围格式如 "10-15"）
-        int startLine = -1;
-        int endLine = -1;
+        String path;
+        String rangeStr;
+        String original;
+        String replacement;
+        boolean autoSearch = false;
         
-        if (rangeStr.matches("^\\d+-\\d+$")) {
-            // 范围格式：10-15
-            try {
-                String[] range = rangeStr.split("-");
-                startLine = Integer.parseInt(range[0]);
-                endLine = Integer.parseInt(range[1]);
-            } catch (NumberFormatException ignored) {
-                return "错误: 行号范围格式不正确，正确格式：10-15 或 10";
-            }
-        } else if (rangeStr.matches("^\\d+$")) {
-            // 单行格式：10
-            try {
-                startLine = Integer.parseInt(rangeStr);
-                endLine = startLine;
-            } catch (NumberFormatException ignored) {
-                return "错误: 行号格式不正确，正确格式：10-15 或 10";
-            }
+        if (editParts.length < 3) {
+            return "错误: #edit 至少需要3个参数，格式：#edit: path|original|replacement 或 #edit: path|range|original|replacement";
+        } else if (editParts.length == 3) {
+            // 3部分格式：path|original|replacement
+            path = editParts[0].trim();
+            rangeStr = "auto";
+            original = editParts[1];
+            replacement = editParts[2];
+            autoSearch = true;
         } else {
-            return "错误: 行号范围格式不正确，正确格式：10-15 或 10";
+            // 4部分格式
+            path = editParts[0].trim();
+            rangeStr = editParts[1].trim();
+            original = editParts[2];
+            replacement = editParts[3];
+            // 如果 range 是 auto 或空，使用自动搜索
+            if (rangeStr.equalsIgnoreCase("auto") || rangeStr.isEmpty()) {
+                autoSearch = true;
+            }
+        }
+        
+        // 解析行号范围
+        int startLine = 1;
+        int endLine = -1; // -1 表示文件末尾
+        
+        if (!autoSearch) {
+            if (rangeStr.matches("^\\d+-\\d+$")) {
+                // 范围格式：10-15
+                try {
+                    String[] range = rangeStr.split("-");
+                    startLine = Integer.parseInt(range[0]);
+                    endLine = Integer.parseInt(range[1]);
+                } catch (NumberFormatException ignored) {
+                    return "错误: 行号范围格式不正确，正确格式：10-15、10 或 auto";
+                }
+            } else if (rangeStr.matches("^\\d+$")) {
+                // 单行格式：10
+                try {
+                    startLine = Integer.parseInt(rangeStr);
+                    endLine = startLine;
+                } catch (NumberFormatException ignored) {
+                    return "错误: 行号格式不正确，正确格式：10-15、10 或 auto";
+                }
+            } else {
+                return "错误: 行号范围格式不正确，正确格式：10-15、10 或 auto";
+            }
         }
 
         File file = new File(root, path);
@@ -635,19 +664,32 @@ public class ToolExecutor {
 
         // 读取文件内容
         List<String> lines = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8);
-        if (startLine < 1 || startLine > lines.size()) {
-            return "错误: 起始行号无效 (文件总行数: " + lines.size() + ")";
-        }
-        if (endLine > lines.size()) {
-            endLine = lines.size(); // 自动修正结束行号
-        }
-        if (startLine > endLine) {
-            return "错误: 起始行号不能大于结束行号";
+        
+        // 自动搜索模式下，搜索整个文件
+        if (autoSearch) {
+            startLine = 1;
+            endLine = lines.size();
+        } else {
+            // 验证行号范围
+            if (startLine < 1 || startLine > lines.size()) {
+                return "错误: 起始行号无效 (文件总行数: " + lines.size() + ")";
+            }
+            if (endLine > lines.size()) {
+                endLine = lines.size();
+            }
+            if (startLine > endLine) {
+                return "错误: 起始行号不能大于结束行号";
+            }
         }
         
-        // 将 original 按行分割
+        // 将 original 按行分割，并去掉行号前缀（如果 AI 从 #read 复制了行号）
         String[] originalLines = original.split("\n");
         int originalLineCount = originalLines.length;
+        
+        // 去掉每行的行号前缀（格式：数字: ）
+        for (int j = 0; j < originalLines.length; j++) {
+            originalLines[j] = removeLineNumberPrefix(originalLines[j]);
+        }
         
         // 在给定行号范围内查找所有匹配位置
         List<Integer> matchPositions = new java.util.ArrayList<>();
@@ -666,7 +708,8 @@ public class ToolExecutor {
                     match = false;
                     break;
                 }
-                if (!lines.get(fileLineIndex).equals(originalLines[j])) {
+                // 使用包含匹配：文件行包含 AI 提供的内容即可
+                if (!lines.get(fileLineIndex).contains(originalLines[j])) {
                     match = false;
                     break;
                 }
@@ -679,22 +722,33 @@ public class ToolExecutor {
         // 根据匹配结果处理
         if (matchPositions.isEmpty()) {
             // 没有找到匹配
-            // 构建实际内容用于显示
-            StringBuilder rangeContent = new StringBuilder();
-            for (int i = startLine - 1; i < endLine; i++) {
-                rangeContent.append(lines.get(i));
-                if (i < endLine - 1) {
-                    rangeContent.append("\n");
+            if (autoSearch) {
+                return "错误: 在文件中未找到包含指定内容的行\n" +
+                       "查找内容: " + original + "\n" +
+                       "提示：请提供更简短的关键内容（如 'enabled: true' 而不是整行）";
+            } else {
+                // 构建实际内容用于显示
+                StringBuilder rangeContent = new StringBuilder();
+                for (int i = startLine - 1; i < endLine; i++) {
+                    rangeContent.append(lines.get(i));
+                    if (i < endLine - 1) {
+                        rangeContent.append("\n");
+                    }
                 }
+                return "错误: 在给定行号范围 " + rangeStr + " 内未找到包含指定内容的行\n" +
+                       "查找内容: " + original + "\n" +
+                       "行号范围内的实际内容:\n" + rangeContent.toString() + "\n" +
+                       "提示：请提供更简短的关键内容（如 'enabled: true' 而不是整行）";
             }
-            return "错误: 在给定行号范围 " + rangeStr + " 内未找到匹配的原始内容\n" +
-                   "原始内容:\n" + original + "\n" +
-                   "行号范围内的实际内容:\n" + rangeContent.toString();
         } else if (matchPositions.size() > 1) {
             // 找到多个匹配
             StringBuilder sb = new StringBuilder();
-            sb.append("错误: 在给定行号范围 ").append(rangeStr).append(" 内找到 ")
-              .append(matchPositions.size()).append(" 处匹配的原始内容，无法确定要替换哪一处\n");
+            if (autoSearch) {
+                sb.append("错误: 在文件中找到 ").append(matchPositions.size()).append(" 处包含指定内容的行，无法确定要替换哪一处\n");
+            } else {
+                sb.append("错误: 在给定行号范围 ").append(rangeStr).append(" 内找到 ")
+                  .append(matchPositions.size()).append(" 处包含指定内容的行，无法确定要替换哪一处\n");
+            }
             sb.append("匹配位置: ");
             for (int i = 0; i < matchPositions.size(); i++) {
                 if (i > 0) sb.append(", ");
@@ -706,7 +760,8 @@ public class ToolExecutor {
                     sb.append("第 ").append(matchStartLine).append("-").append(matchEndLine).append(" 行");
                 }
             }
-            sb.append("\n请缩小行号范围或使用更具体的原始内容来唯一确定要替换的位置。");
+            sb.append("\n请使用更具体的行号范围（如 ").append(matchPositions.get(0) + 1).append("-")
+              .append(matchPositions.get(0) + originalLineCount).append("）来唯一确定要替换的位置。");
             return sb.toString();
         }
         
@@ -722,10 +777,37 @@ public class ToolExecutor {
             newLines.add(lines.get(i));
         }
         
-        // 插入修改后的内容
+        // 插入修改后的内容（保留缩进和注释）
         String[] replacementLines = replacement.split("\n");
-        for (String rLine : replacementLines) {
-            newLines.add(rLine);
+        for (int j = 0; j < originalLineCount; j++) {
+            String originalLine = lines.get(matchStartIndex + j);
+            String newLine;
+            
+            if (j < replacementLines.length) {
+                // 提取原始行的缩进和注释
+                String indent = extractIndent(originalLine);
+                String comment = extractComment(originalLine);
+                
+                int textEndPos = originalLine.indexOf('#');
+                if (textEndPos == -1) {
+                    textEndPos = originalLine.length();
+                }
+                
+                // 构建新行：缩进 + 新内容 + 注释
+                newLine = indent + replacementLines[j];
+                if (!comment.isEmpty()) {
+                    newLine += comment;
+                }
+            } else {
+                // 如果 replacement 行数少于 original 行数，保留原始行
+                newLine = originalLine;
+            }
+            newLines.add(newLine);
+        }
+        
+        // 如果 replacement 行数多于 original 行数，添加剩余的行
+        for (int j = originalLineCount; j < replacementLines.length; j++) {
+            newLines.add(replacementLines[j]);
         }
         
         // 复制匹配位置之后的行
@@ -1596,5 +1678,64 @@ public class ToolExecutor {
             case "edit", "diff" -> "edit";
             default -> type;
         };
+    }
+
+    /**
+     * 提取行的缩进（前导空格和制表符）
+     * @param line 原始行
+     * @return 缩进字符串
+     */
+    private String extractIndent(String line) {
+        StringBuilder indent = new StringBuilder();
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == ' ' || c == '\t') {
+                indent.append(c);
+            } else {
+                break;
+            }
+        }
+        return indent.toString();
+    }
+
+    /**
+     * 提取行的注释（# 及其后的内容）
+     * @param line 原始行
+     * @return 注释字符串（包括 #），如果没有注释则返回空字符串
+     */
+    private String extractComment(String line) {
+        int commentIndex = line.indexOf('#');
+        if (commentIndex != -1) {
+            return line.substring(commentIndex);
+        }
+        return "";
+    }
+
+    /**
+     * 去掉行号前缀（格式：数字: ）
+     * @param line 带行号的行，如 "94: enabled: true"
+     * @return 去掉行号后的行，如 "enabled: true"
+     */
+    private String removeLineNumberPrefix(String line) {
+        // 查找第一个冒号
+        int colonIndex = line.indexOf(':');
+        if (colonIndex != -1) {
+            // 检查冒号前是否都是数字（行号）
+            boolean isLineNumber = true;
+            for (int i = 0; i < colonIndex; i++) {
+                char c = line.charAt(i);
+                if (!Character.isDigit(c)) {
+                    isLineNumber = false;
+                    break;
+                }
+            }
+            // 如果是行号格式，去掉行号和冒号
+            if (isLineNumber) {
+                String remaining = line.substring(colonIndex + 1);
+                // 去掉冒号后的空格
+                return remaining.trim();
+            }
+        }
+        return line;
     }
 }

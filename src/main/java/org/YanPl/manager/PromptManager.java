@@ -172,18 +172,31 @@ public class PromptManager {
             sb.append("  #list: <path> - List directory contents. Example: #list: plugins/FancyHelper\n");
         }
         if (plugin.getConfigManager().isPlayerToolEnabled(player, "read")) {
-            sb.append("  #read: <path> [start]-[end] - Read file content. Optional line range. Example: #read: plugins/FancyHelper/config.yml 1-50\n");
+            sb.append("  #read: <path> [start]-[end] - Read file content with line numbers.\n");
+            sb.append("    Format: #read: path  OR  #read: path 1-50\n");
+            sb.append("    Example: #read: plugins/FancyHelper/config.yml\n");
+            sb.append("    **IMPORTANT**: The returned content includes line numbers (format: '1: content', '2: content', etc.)\n");
+            sb.append("    - Use these line numbers when calling #edit to specify exact positions\n");
+            sb.append("    - Example: If you want to edit line 10, use: #edit: path|10-10|original|replacement\n");
         }
         if (plugin.getConfigManager().isPlayerToolEnabled(player, "edit")) {
-            sb.append("  #edit: <path>|<range>|<original>|<replacement> - Modify file content by searching within line range.\n");
-            sb.append("    Format: #edit: path|range|original|replacement\n");
-            sb.append("    Example: #edit: config.yml|10-15|old text|new text\n");
-            sb.append("    How it works: The system searches for 'original' text WITHIN the specified line range and replaces it.\n");
-            sb.append("    **Line Range Tips**:\n");
-            sb.append("    - If you're unsure about exact line numbers, specify a BROADER range (e.g., 1-100 instead of 10-15)\n");
-            sb.append("    - The system will find the 'original' text within that range and replace it\n");
-            sb.append("    - If multiple matches are found in the range, the operation will be rejected with match locations\n");
-            sb.append("    - Broader ranges reduce the risk of 'not found' errors\n");
+            sb.append("  #edit: <path>|<range>|<original>|<replacement> - Modify file content by searching for lines containing 'original' text.\n");
+            sb.append("    **RECOMMENDED Workflow**:\n");
+            sb.append("    1. First, use #read: path to see the file with line numbers\n");
+            sb.append("    2. Then use #edit: path|lineNumber-lineNumber|original|replacement with exact line numbers\n");
+            sb.append("    \n");
+            sb.append("    **How Matching Works**:\n");
+            sb.append("    - The system searches for lines that CONTAIN your 'original' text (not exact match)\n");
+            sb.append("    - Example: If file line is '  enabled: true  # comment', you can provide 'enabled: true' and it will match\n");
+            sb.append("    - **IMPORTANT**: The system automatically PRESERVES indentation and comments from the original line\n");
+            sb.append("    - Use short, unique content to avoid multiple matches\n");
+            sb.append("    \n");
+            sb.append("    **Format Options**:\n");
+            sb.append("    - Best: #edit: path|10-10|key text|new text (use exact line numbers from #read)\n");
+            sb.append("    - Alternative: #edit: path|auto|key text|new text (auto-search, but may find multiple matches)\n");
+            sb.append("    - Legacy: #edit: path|10-15|key text|new text (with line range)\n");
+            sb.append("    Example: #edit: config.yml|10-10|enabled: true|enabled: false\n");
+            sb.append("    Result: Original '  enabled: true  # comment' becomes '  enabled: false  # comment' (indentation and comment preserved)\n");
             sb.append("    Constraint: #edit must be the last part of response. No #end after it.\n");
         }
         sb.append("  Prohibition: Do NOT use #read to access preset files under plugins/FancyHelper/preset. Use #getpreset: <file> instead.\n\n");
