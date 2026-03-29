@@ -49,6 +49,7 @@ public class DialogueSession {
     private String lastError = null;
     private boolean verboseLogging = false;
     private boolean systemPromptLogged = false;
+    private int lastLoggedMessageCount = 0;
     private final Map<Long, ThoughtSnapshot> thoughtSnapshots = new LinkedHashMap<Long, ThoughtSnapshot>(64, 0.75f, false) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<Long, ThoughtSnapshot> eldest) {
@@ -245,6 +246,14 @@ public class DialogueSession {
 
     public List<Message> getHistory() {
         return history;
+    }
+
+    public int getLastLoggedMessageCount() {
+        return lastLoggedMessageCount;
+    }
+
+    public void setLastLoggedMessageCount(int count) {
+        this.lastLoggedMessageCount = count;
     }
 
     public int getEstimatedTokens() {
