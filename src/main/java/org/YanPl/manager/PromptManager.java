@@ -175,9 +175,15 @@ public class PromptManager {
             sb.append("  #read: <path> [start]-[end] - Read file content. Optional line range. Example: #read: plugins/FancyHelper/config.yml 1-50\n");
         }
         if (plugin.getConfigManager().isPlayerToolEnabled(player, "edit")) {
-            sb.append("  #edit: <path>|<range>|<original>|<replacement> - Modify file content by line range.\n");
+            sb.append("  #edit: <path>|<range>|<original>|<replacement> - Modify file content by searching within line range.\n");
             sb.append("    Format: #edit: path|range|original|replacement\n");
             sb.append("    Example: #edit: config.yml|10-15|old text|new text\n");
+            sb.append("    How it works: The system searches for 'original' text WITHIN the specified line range and replaces it.\n");
+            sb.append("    **Line Range Tips**:\n");
+            sb.append("    - If you're unsure about exact line numbers, specify a BROADER range (e.g., 1-100 instead of 10-15)\n");
+            sb.append("    - The system will find the 'original' text within that range and replace it\n");
+            sb.append("    - If multiple matches are found in the range, the operation will be rejected with match locations\n");
+            sb.append("    - Broader ranges reduce the risk of 'not found' errors\n");
             sb.append("    Constraint: #edit must be the last part of response. No #end after it.\n");
         }
         sb.append("  Prohibition: Do NOT use #read to access preset files under plugins/FancyHelper/preset. Use #getpreset: <file> instead.\n\n");
