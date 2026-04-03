@@ -99,25 +99,36 @@ public class CloudFlareAI {
                         requestSb.append("Model: ").append(reqObj.get("model").getAsString()).append("\n\n");
                     }
                     
-                    // 记录消息
+                    // 记录消息（只记录本次新增的消息，避免重复记录历史上下文）
                     if (reqObj.has("messages") && reqObj.get("messages").isJsonArray()) {
                         JsonArray messages = reqObj.get("messages").getAsJsonArray();
-                        requestSb.append("Messages (").append(messages.size()).append(" items):\n");
+                        int lastLoggedCount = session.getLastLoggedMessageCount();
+                        int newMessageCount = messages.size() - lastLoggedCount;
                         
-                        for (int i = 0; i < messages.size(); i++) {
-                            JsonObject msg = messages.get(i).getAsJsonObject();
-                            if (msg.has("role") && msg.has("content")) {
-                                String role = msg.get("role").getAsString();
-                                String content = msg.get("content").getAsString();
-                                
-                                // 记录系统提示词（只记录一次）
-                                if ("system".equals(role)) {
-                                    session.logSystemPrompt(content);
-                                } else {
-                                    requestSb.append("\n[").append(role.toUpperCase()).append("]:\n");
-                                    requestSb.append(content).append("\n");
+                        if (newMessageCount > 0) {
+                            requestSb.append("New Messages (").append(newMessageCount).append(" items):\n");
+                            
+                            // 只记录新增的消息（从 lastLoggedCount 开始）
+                            for (int i = lastLoggedCount; i < messages.size(); i++) {
+                                JsonObject msg = messages.get(i).getAsJsonObject();
+                                if (msg.has("role") && msg.has("content")) {
+                                    String role = msg.get("role").getAsString();
+                                    String content = msg.get("content").getAsString();
+                                    
+                                    // 记录系统提示词（只记录一次）
+                                    if ("system".equals(role)) {
+                                        session.logSystemPrompt(content);
+                                    } else {
+                                        requestSb.append("\n[").append(role.toUpperCase()).append("]:\n");
+                                        requestSb.append(content).append("\n");
+                                    }
                                 }
                             }
+                            
+                            // 更新已记录的消息数量
+                            session.setLastLoggedMessageCount(messages.size());
+                        } else {
+                            requestSb.append("No new messages (all already logged)\n");
                         }
                     }
                     
