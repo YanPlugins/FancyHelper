@@ -1436,6 +1436,24 @@ public class CLIManager {
         // 使用异步任务重试
         if (!plugin.isEnabled()) return;
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            // 设置重试回调，向玩家显示重试提示
+            ai.setRetryCallback((statusCode, retryMessage) -> {
+                if (!plugin.isEnabled()) return;
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (player.isOnline()) {
+                        TextComponent retryMsg;
+                        if (statusCode == 429) {
+                            // 429 错误使用黄色⁕ 白色
+                            retryMsg = new TextComponent(ChatColor.YELLOW + "⁕ " + ChatColor.WHITE + retryMessage);
+                        } else {
+                            // 其他错误使用灰色⁕
+                            retryMsg = new TextComponent(ChatColor.GRAY + "⁕ " + retryMessage);
+                        }
+                        player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.CHAT, retryMsg);
+                    }
+                });
+            });
+            
             try {
                 // 如果有最后一条消息，重新加入会话（因为失败时会被移除）
                 if (retryInfo.lastMessage != null) {
@@ -1457,17 +1475,26 @@ public class CLIManager {
                     }
                     retryInfoMap.put(uuid, new RetryInfo(retryInfo.session, retryInfo.systemPrompt, retryInfo.lastMessage, retryInfo.isUserMessage));
 
-                    player.sendMessage(ChatColor.RED + "⨀ AI 调用失败（重试）: " + e.getMessage());
+                    String errorMsg = e.getMessage();
+                    // 只显示友好的提示消息（FancyHelper > 开头的）
+                    if (errorMsg != null && errorMsg.startsWith("§zFancyHelper§b§r §7> §f")) {
+                        player.sendMessage(ColorUtil.translateCustomColors(errorMsg));
+                    } else if (errorMsg != null && errorMsg.startsWith("FancyHelper > ")) {
+                        player.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f" + errorMsg.substring("FancyHelper > ".length())));
+                    } else {
+                        player.sendMessage(ChatColor.RED + "⨀ AI 调用失败（重试）: " + errorMsg);
+                    }
+                    plugin.getLogger().warning(errorMsg);
 
-                    // 显示重试按钮
-                    TextComponent retryMsg = new TextComponent(ChatColor.YELLOW + "点击 ");
-                    TextComponent retryBtn = new TextComponent(ChatColor.GREEN + "[ 重试 ]");
+                    // 显示重试按钮（与报错信息同一行）
+                    TextComponent retryBtn = new TextComponent(ChatColor.WHITE + "(");
+                    retryBtn.addExtra(new TextComponent(ChatColor.GREEN + "🔄"));
                     retryBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli retry"));
-                    retryBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GREEN + "点击再次重试")));
-                    retryMsg.addExtra(retryBtn);
-                    retryMsg.addExtra(new TextComponent(ChatColor.YELLOW + " 来重新尝试"));
+                    String hoverText = "§b§l=======\n§b§l|  重试  |\n§b§l=======";
+                    retryBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.translateAlternateColorCodes('&', hoverText))));
+                    retryBtn.addExtra(new TextComponent(ChatColor.WHITE + ")"));
 
-                    player.spigot().sendMessage(retryMsg);
+                    player.spigot().sendMessage(retryBtn);
 
                     isGenerating.put(uuid, false);
                     recordThinkingTime(uuid);
@@ -1503,6 +1530,9 @@ public class CLIManager {
                     generationStartTimes.remove(uuid);
                     player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR, new TextComponent(""));
                 });
+            } finally {
+                // 清除重试回调
+                ai.clearRetryCallback();
             }
         });
     }
@@ -1532,6 +1562,24 @@ public class CLIManager {
 
         if (!plugin.isEnabled()) return;
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            // 设置重试回调，向玩家显示重试提示
+            ai.setRetryCallback((statusCode, retryMessage) -> {
+                if (!plugin.isEnabled()) return;
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (player.isOnline()) {
+                        TextComponent retryMsg;
+                        if (statusCode == 429) {
+                            // 429 错误使用黄色⁕ 白色
+                            retryMsg = new TextComponent(ChatColor.YELLOW + "⁕ " + ChatColor.WHITE + retryMessage);
+                        } else {
+                            // 其他错误使用灰色⁕
+                            retryMsg = new TextComponent(ChatColor.GRAY + "⁕ " + retryMessage);
+                        }
+                        player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.CHAT, retryMsg);
+                    }
+                });
+            });
+            
             try {
                 AIResponse response = ai.chat(session, promptManager.getBaseSystemPrompt(player));
                 if (!plugin.isEnabled()) return;
@@ -1543,17 +1591,26 @@ public class CLIManager {
                     // 保存重试信息
                     retryInfoMap.put(uuid, new RetryInfo(session, promptManager.getBaseSystemPrompt(player), message, true));
 
-                    player.sendMessage(ChatColor.RED + "⨀ AI 调用出错: " + e.getMessage());
+                    String errorMsg = e.getMessage();
+                    // 只显示友好的提示消息（FancyHelper > 开头的）
+                    if (errorMsg != null && errorMsg.startsWith("§zFancyHelper§b§r §7> §f")) {
+                        player.sendMessage(ColorUtil.translateCustomColors(errorMsg));
+                    } else if (errorMsg != null && errorMsg.startsWith("FancyHelper > ")) {
+                        player.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f" + errorMsg.substring("FancyHelper > ".length())));
+                    } else {
+                        player.sendMessage(ChatColor.RED + "⨀ AI 调用出错: " + errorMsg);
+                    }
+                    plugin.getLogger().warning(errorMsg);
 
-                    // 显示重试按钮
-                    TextComponent retryMsg = new TextComponent(ChatColor.YELLOW + "点击 ");
-                    TextComponent retryBtn = new TextComponent(ChatColor.GREEN + "[ 重试 ]");
+                    // 显示重试按钮（与报错信息同一行）
+                    TextComponent retryBtn = new TextComponent(ChatColor.WHITE + "(");
+                    retryBtn.addExtra(new TextComponent(ChatColor.GREEN + "🔄"));
                     retryBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli retry"));
-                    retryBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GREEN + "点击重试 AI 调用")));
-                    retryMsg.addExtra(retryBtn);
-                    retryMsg.addExtra(new TextComponent(ChatColor.YELLOW + " 来重新尝试"));
+                    String hoverText = "§b§l=======\n§b§l|  重试  |\n§b§l=======";
+                    retryBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.translateAlternateColorCodes('&', hoverText))));
+                    retryBtn.addExtra(new TextComponent(ChatColor.WHITE + ")"));
 
-                    player.spigot().sendMessage(retryMsg);
+                    player.spigot().sendMessage(retryBtn);
 
                     isGenerating.put(uuid, false);
                     recordThinkingTime(uuid);
@@ -1572,16 +1629,17 @@ public class CLIManager {
                     retryInfoMap.put(uuid, new RetryInfo(session, promptManager.getBaseSystemPrompt(player), message, true));
 
                     player.sendMessage(ChatColor.RED + "⨀ 系统内部错误: " + t.getMessage());
+                    plugin.getLogger().warning(t.getMessage());
 
-                    // 显示重试按钮
-                    TextComponent retryMsg = new TextComponent(ChatColor.YELLOW + "点击 ");
-                    TextComponent retryBtn = new TextComponent(ChatColor.GREEN + "[ 重试 ]");
+                    // 显示重试按钮（与报错信息同一行）
+                    TextComponent retryBtn = new TextComponent(ChatColor.WHITE + "(");
+                    retryBtn.addExtra(new TextComponent(ChatColor.GREEN + "🔄"));
                     retryBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli retry"));
-                    retryBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GREEN + "点击重试 AI 调用")));
-                    retryMsg.addExtra(retryBtn);
-                    retryMsg.addExtra(new TextComponent(ChatColor.YELLOW + " 来重新尝试"));
+                    String hoverText = "§b§l=======\n§b§l|  重试  |\n§b§l=======";
+                    retryBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.translateAlternateColorCodes('&', hoverText))));
+                    retryBtn.addExtra(new TextComponent(ChatColor.WHITE + ")"));
 
-                    player.spigot().sendMessage(retryMsg);
+                    player.spigot().sendMessage(retryBtn);
 
                     isGenerating.put(uuid, false);
                     recordThinkingTime(uuid);
@@ -1592,6 +1650,9 @@ public class CLIManager {
                     // 移除导致失败的消息，防止污染后续对话
                     session.removeLastMessage();
                 });
+            } finally {
+                // 清除重试回调
+                ai.clearRetryCallback();
             }
         });
     }
@@ -1819,6 +1880,24 @@ public class CLIManager {
         // 异步调用 AI 继续生成
         if (!plugin.isEnabled()) return;
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            // 设置重试回调，向玩家显示重试提示
+            ai.setRetryCallback((statusCode, retryMessage) -> {
+                if (!plugin.isEnabled()) return;
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (player.isOnline()) {
+                        TextComponent retryMsg;
+                        if (statusCode == 429) {
+                            // 429 错误使用黄色⁕ 白色
+                            retryMsg = new TextComponent(ChatColor.YELLOW + "⁕ " + ChatColor.WHITE + retryMessage);
+                        } else {
+                            // 其他错误使用灰色⁕
+                            retryMsg = new TextComponent(ChatColor.GRAY + "⁕ " + retryMessage);
+                        }
+                        player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.CHAT, retryMsg);
+                    }
+                });
+            });
+            
             try {
                 AIResponse response = ai.chat(session, promptManager.getBaseSystemPrompt(player));
                 if (!plugin.isEnabled()) return;
@@ -1829,11 +1908,23 @@ public class CLIManager {
                 plugin.getCloudErrorReport().report(e);
                 if (!plugin.isEnabled()) return;
                 Bukkit.getScheduler().runTask(plugin, () -> {
-                    player.sendMessage(ChatColor.RED + "⨀ 继续生成失败: " + e.getMessage());
+                    String errorMsg = e.getMessage();
+                    // 只显示友好的提示消息（FancyHelper > 开头的）
+                    if (errorMsg != null && errorMsg.startsWith("§zFancyHelper§b§r §7> §f")) {
+                        player.sendMessage(ColorUtil.translateCustomColors(errorMsg));
+                    } else if (errorMsg != null && errorMsg.startsWith("FancyHelper > ")) {
+                        player.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f" + errorMsg.substring("FancyHelper > ".length())));
+                    } else {
+                        player.sendMessage(ChatColor.RED + "⨀ 继续生成失败: " + errorMsg);
+                    }
+                    plugin.getLogger().warning(errorMsg);
                     isGenerating.put(uuid, false);
                     generationStates.put(uuid, GenerationStatus.ERROR);
                     generationStartTimes.remove(uuid);
                 });
+            } finally {
+                // 清除重试回调
+                ai.clearRetryCallback();
             }
         });
     }
@@ -2005,6 +2096,25 @@ public class CLIManager {
         if (!plugin.isEnabled()) return;
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             final String systemPrompt = promptManager.getBaseSystemPrompt(player); // 在 try 块外部定义
+            
+            // 设置重试回调，向玩家显示重试提示
+            ai.setRetryCallback((statusCode, retryMessage) -> {
+                if (!plugin.isEnabled()) return;
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (player.isOnline()) {
+                        TextComponent retryMsg;
+                        if (statusCode == 429) {
+                            // 429 错误使用黄色⁕ 白色
+                            retryMsg = new TextComponent(ChatColor.YELLOW + "⁕ " + ChatColor.WHITE + retryMessage);
+                        } else {
+                            // 其他错误使用灰色⁕
+                            retryMsg = new TextComponent(ChatColor.GRAY + "⁕ " + retryMessage);
+                        }
+                        player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.CHAT, retryMsg);
+                    }
+                });
+            });
+            
             try {
                     AIResponse response = ai.chat(session, systemPrompt);
 
@@ -2018,17 +2128,26 @@ public class CLIManager {
                     // 保存重试信息
                     retryInfoMap.put(uuid, new RetryInfo(session, systemPrompt, feedback, false));
 
-                    player.sendMessage(ChatColor.RED + "⨀ AI 调用出错: " + e.getMessage());
+                    String errorMsg = e.getMessage();
+                    // 只显示友好的提示消息（FancyHelper > 开头的）
+                    if (errorMsg != null && errorMsg.startsWith("§zFancyHelper§b§r §7> §f")) {
+                        player.sendMessage(ColorUtil.translateCustomColors(errorMsg));
+                    } else if (errorMsg != null && errorMsg.startsWith("FancyHelper > ")) {
+                        player.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f" + errorMsg.substring("FancyHelper > ".length())));
+                    } else {
+                        player.sendMessage(ChatColor.RED + "⨀ AI 调用出错: " + errorMsg);
+                    }
+                    plugin.getLogger().warning(errorMsg);
 
-                    // 显示重试按钮
-                    TextComponent retryMsg = new TextComponent(ChatColor.YELLOW + "点击 ");
-                    TextComponent retryBtn = new TextComponent(ChatColor.GREEN + "[ 重试 ]");
+                    // 显示重试按钮（与报错信息同一行）
+                    TextComponent retryBtn = new TextComponent(ChatColor.WHITE + "(");
+                    retryBtn.addExtra(new TextComponent(ChatColor.GREEN + "🔄"));
                     retryBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli retry"));
-                    retryBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GREEN + "点击重试 AI 调用")));
-                    retryMsg.addExtra(retryBtn);
-                    retryMsg.addExtra(new TextComponent(ChatColor.YELLOW + " 来重新尝试"));
+                    String hoverText = "§b§l=======\n§b§l|  重试  |\n§b§l=======";
+                    retryBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.translateAlternateColorCodes('&', hoverText))));
+                    retryBtn.addExtra(new TextComponent(ChatColor.WHITE + ")"));
 
-                    player.spigot().sendMessage(retryMsg);
+                    player.spigot().sendMessage(retryBtn);
 
                     isGenerating.put(uuid, false);
                     recordThinkingTime(uuid);
@@ -2048,15 +2167,15 @@ public class CLIManager {
 
                     player.sendMessage(ChatColor.RED + "⨀ 系统内部错误: " + t.getMessage());
 
-                    // 显示重试按钮
-                    TextComponent retryMsg = new TextComponent(ChatColor.YELLOW + "点击 ");
-                    TextComponent retryBtn = new TextComponent(ChatColor.GREEN + "[ 重试 ]");
+                    // 显示重试按钮（与报错信息同一行）
+                    TextComponent retryBtn = new TextComponent(ChatColor.WHITE + "(");
+                    retryBtn.addExtra(new TextComponent(ChatColor.GREEN + "🔄"));
                     retryBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cli retry"));
-                    retryBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.GREEN + "点击重试 AI 调用")));
-                    retryMsg.addExtra(retryBtn);
-                    retryMsg.addExtra(new TextComponent(ChatColor.YELLOW + " 来重新尝试"));
+                    String hoverText = "§b§l=======\n§b§l|  重试  |\n§b§l=======";
+                    retryBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatColor.translateAlternateColorCodes('&', hoverText))));
+                    retryBtn.addExtra(new TextComponent(ChatColor.WHITE + ")"));
 
-                    player.spigot().sendMessage(retryMsg);
+                    player.spigot().sendMessage(retryBtn);
 
                     isGenerating.put(uuid, false);
                     recordThinkingTime(uuid);
@@ -2067,6 +2186,9 @@ public class CLIManager {
                     // 移除导致失败的消息，防止污染后续对话
                     session.removeLastMessage();
                 });
+            } finally {
+                // 清除重试回调
+                ai.clearRetryCallback();
             }
         });
     }

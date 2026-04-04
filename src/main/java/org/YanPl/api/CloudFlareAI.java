@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiConsumer;
 
 /**
  * CloudFlare AI API 封装类
@@ -32,6 +33,7 @@ public class CloudFlareAI {
     private final Gson gson = new Gson();
     private final ResponseParser responseParser = new ResponseParser();
     private String cachedAccountId = null;
+    private BiConsumer<Integer, String> retryCallback = null;
 
     public CloudFlareAI(FancyHelper plugin) {
         this.plugin = plugin;
@@ -44,6 +46,21 @@ public class CloudFlareAI {
 
     public HttpClient getHttpClient() {
         return httpClient;
+    }
+
+    /**
+     * 设置重试回调函数
+     * @param callback 当发生重试时的回调，参数1为HTTP状态码，参数2为重试提示消息
+     */
+    public void setRetryCallback(BiConsumer<Integer, String> callback) {
+        this.retryCallback = callback;
+    }
+
+    /**
+     * 清除重试回调函数
+     */
+    public void clearRetryCallback() {
+        this.retryCallback = null;
     }
 
     /**
@@ -62,7 +79,7 @@ public class CloudFlareAI {
                     errorMsg.contains("Connection reset") || 
                     errorMsg.contains("EOF reached"))) {
                     
-                    plugin.getLogger().warning("[AI 请求] 网络请求失败 (尝试 " + (i + 1) + "/" + maxRetries + "): " + errorMsg + "，正在重试...");
+                    plugin.getLogger().warning("[ReTry] 网络请求失败 (尝试 " + (i + 1) + "/" + maxRetries + "): " + errorMsg + "，正在重试...");
                     if (i < maxRetries - 1) {
                         Thread.sleep(500 * (i + 1)); // 指数退避
                         continue;
@@ -288,7 +305,8 @@ public class CloudFlareAI {
 
         String cfKey = plugin.getConfigManager().getCloudflareCfKey();
         if (cfKey.isEmpty()) {
-            throw new IOException("错误: 请先在配置文件中设置 cloudflare.cf_key。");
+            plugin.getLogger().severe("[AI 错误] 未配置 Cloudflare API Key");
+            throw new IOException("§zFancyHelper§b§r §7> §fAPI调用发生未知错误，请查看控制台");
         }
 
         try {
@@ -302,7 +320,9 @@ public class CloudFlareAI {
             HttpResponse<String> response = sendWithRetry(request);
 
             if (response.statusCode() != 200) {
-                throw new IOException("获取 Account ID 失败: " + response.statusCode() + " " + response.body());
+                plugin.getLogger().warning("[AI 错误] 获取 Account ID 失败: " + response.statusCode());
+                plugin.getLogger().warning("[AI 错误] 响应体: " + response.body());
+                throw new IOException("§zFancyHelper§b§r §7> §fAPI调用发生未知错误，请查看控制台");
             }
 
             JsonObject resultJson = gson.fromJson(response.body(), JsonObject.class);
@@ -311,10 +331,12 @@ public class CloudFlareAI {
                 cachedAccountId = resultJson.getAsJsonArray("result").get(0).getAsJsonObject().get("id").getAsString();
                 return cachedAccountId;
             } else {
-                throw new IOException("未找到关联的 CloudFlare 账户，请检查 cf_key 权限。");
+                plugin.getLogger().warning("[AI 错误] 未找到关联的 CloudFlare 账户");
+                throw new IOException("§zFancyHelper§b§r §7> §fAPI调用发生未知错误，请查看控制台");
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            plugin.getLogger().warning("[AI 错误] 获取 Account ID 被中断: " + e.getMessage());
             throw new IOException("获取 Account ID 被中断: " + e.getMessage(), e);
         }
     }
@@ -402,8 +424,54 @@ public class CloudFlareAI {
 
             HttpResponse<String> response = sendWithRetry(request);
             String responseBody = response.body();
+            int statusCode = response.statusCode();
             if (plugin.getConfigManager().isDebug()) {
-                plugin.getLogger().info("[AI 响应] 状态码: " + response.statusCode());
+                plugin.getLogger().info("[AI 响应] 状态码: " + statusCode);
+            }
+
+            // 处理临时性错误（可重试），包括：429、500、502、503、504
+            int maxRetries = 3;
+            int retryCount = 0;
+            while (isRetryableError(statusCode) && retryCount < maxRetries) {
+                retryCount++;
+                
+                String errorType = getErrorTypeDescription(statusCode);
+                long waitSeconds = extractRetryAfter(response);
+                
+                if (waitSeconds <= 0) {
+                    // 使用指数退避策略：2秒、4秒、8秒
+                    waitSeconds = (long) Math.pow(2, retryCount);
+                }
+                
+                plugin.getLogger().warning("[AI 重试] 收到 " + statusCode + " " + errorType + "，等待 " + waitSeconds + " 秒后重试 (" + retryCount + "/" + maxRetries + ")...");
+                
+                // 触发重试回调，通知玩家正在重试
+                if (retryCallback != null) {
+                    if (statusCode == 429) {
+                        // 429 错误使用特殊配色：黄色⁕ 白色
+                        retryCallback.accept(statusCode, "请求速率达到上限，正在重试...");
+                    } else {
+                        // 其他错误使用普通配色
+                        retryCallback.accept(statusCode, "服务器繁忙，正在重试...");
+                    }
+                }
+                
+                try {
+                    Thread.sleep(waitSeconds * 1000);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    plugin.getLogger().warning("[AI 错误] OpenAI API 调用被中断: " + ie.getMessage());
+                    throw new IOException("OpenAI API 调用被中断: " + ie.getMessage(), ie);
+                }
+                
+                // 重新发送请求
+                response = sendWithRetry(request);
+                responseBody = response.body();
+                statusCode = response.statusCode();
+                
+                if (plugin.getConfigManager().isDebug()) {
+                    plugin.getLogger().info("[AI 响应] 重试后状态码: " + statusCode);
+                }
             }
 
             // 调试日志：输出响应体前 500 个字符
@@ -415,9 +483,17 @@ public class CloudFlareAI {
             // 记录原始输入和输出到调试日志文件
             logInteraction(session, bodyString, responseBody);
 
-            if (response.statusCode() != 200) {
-                plugin.getLogger().warning("[AI 错误] 响应体: " + responseBody);
-                throw new IOException("OpenAI API 调用失败: " + response.statusCode() + " - " + responseBody);
+            if (statusCode != 200) {
+                String errorPrompt = getErrorPrompt(statusCode);
+                String errorMsg;
+                if (errorPrompt != null) {
+                    errorMsg = errorPrompt;
+                } else {
+                    errorMsg = "§zFancyHelper§b§r §7> §fAPI调用发生未知错误，请查看控制台";
+                    plugin.getLogger().warning("[AI 错误] 状态码: " + statusCode);
+                    plugin.getLogger().warning("[AI 错误] 响应体: " + responseBody);
+                }
+                throw new IOException(errorMsg);
             }
 
             JsonObject responseJson = gson.fromJson(responseBody, JsonObject.class);
@@ -433,10 +509,102 @@ public class CloudFlareAI {
                 return aiResponse;
             }
 
-            throw new IOException("无法解析 OpenAI API 响应结果: " + responseBody);
+            plugin.getLogger().warning("[AI 错误] 无法解析 OpenAI API 响应: " + responseBody);
+            throw new IOException("§zFancyHelper§b§r §7> §fAPI调用发生未知错误，请查看控制台");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            plugin.getLogger().warning("[AI 错误] OpenAI API 调用被中断: " + e.getMessage());
             throw new IOException("OpenAI API 调用被中断: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 从 HTTP 响应头中提取 Retry-After 值
+     * @param response HTTP 响应
+     * @return 等待秒数，如果未找到则返回 0
+     */
+    private long extractRetryAfter(HttpResponse<String> response) {
+        // 尝试获取 Retry-After 头
+        String retryAfter = response.headers().firstValue("Retry-After").orElse(null);
+        if (retryAfter != null && !retryAfter.isEmpty()) {
+            try {
+                // Retry-After 可以是秒数或 HTTP 日期
+                return Long.parseLong(retryAfter);
+            } catch (NumberFormatException e) {
+                // 如果不是数字，可能是 HTTP 日期格式，这里简化处理
+                plugin.getLogger().warning("[AI 速率限制] 无法解析 Retry-After 头: " + retryAfter);
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * 判断 HTTP 状态码是否为可重试的临时性错误
+     * @param statusCode HTTP 状态码
+     * @return 是否可重试
+     */
+    private boolean isRetryableError(int statusCode) {
+        // 429: 速率限制
+        // 500: 服务器内部错误
+        // 502: 网关错误
+        // 503: 服务不可用
+        // 504: 网关超时
+        return statusCode == 429 || statusCode == 500 || statusCode == 502 || statusCode == 503 || statusCode == 504;
+    }
+
+    /**
+     * 获取错误类型的描述
+     * @param statusCode HTTP 状态码
+     * @return 错误类型描述
+     */
+    private String getErrorTypeDescription(int statusCode) {
+        switch (statusCode) {
+            case 400:
+                return "请求体有问题";
+            case 401:
+                return "API-key 不正确";
+            case 402:
+                return "余额不足";
+            case 422:
+                return "请求体有问题";
+            case 429:
+                return "速率限制";
+            case 500:
+                return "服务器内部错误";
+            case 502:
+                return "网关错误";
+            case 503:
+                return "服务不可用";
+            case 504:
+                return "网关超时";
+            default:
+                return "错误";
+        }
+    }
+
+    /**
+     * 获取错误的详细提示消息
+     * @param statusCode HTTP 状态码
+     * @return 错误提示消息
+     */
+    private String getErrorPrompt(int statusCode) {
+        switch (statusCode) {
+            case 400:
+                return "§zFancyHelper§b§r §7> §f构造的请求体有问题，请向开发者报告此错误";
+            case 401:
+                return "§zFancyHelper§b§r §7> §fAPI-key填写不正确，请检查config.yml";
+            case 402:
+                return "§zFancyHelper§b§r §7> §f开放平台显示您的余额不足，请检查您的开放平台余额";
+            case 422:
+                return "§zFancyHelper§b§r §7> §f构造的请求体有问题，请向开发者报告此错误";
+            case 429:
+                return null; // 429 错误会自动重试，不需要提示
+            case 500:
+                return "§zFancyHelper§b§r §7> §f开放平台出现问题，请等待恢复";
+            case 503:
+                return "§zFancyHelper§b§r §7> §f开放平台出现问题，请等待恢复";
+            default:
+                return null;
         }
     }
 
@@ -502,7 +670,7 @@ public class CloudFlareAI {
         if (bodyString.contains("\"content\":null") || bodyString.contains("\"role\":null")) {
             plugin.getLogger().severe("[AI 错误] 严重：载荷中包含空的 content 或 role！");
             plugin.getLogger().severe("[AI 错误] 完整载荷: " + bodyString);
-            throw new IOException("载荷验证失败: JSON 中检测到空的 content 或 role");
+            throw new IOException("§zFancyHelper§b§r §7> §fAPI调用发生未知错误，请查看控制台");
         }
 
         if (bodyString.matches(".*\"content\":\\s*\"\"\\s*[,}].*")) {
@@ -558,9 +726,11 @@ public class CloudFlareAI {
                 return aiResponse;
             }
 
-            throw new IOException("无法解析 AI 响应结果: " + responseBody);
+            plugin.getLogger().warning("[AI 错误] 无法解析响应: " + responseBody);
+            throw new IOException("§zFancyHelper§b§r §7> §fAPI调用发生未知错误，请查看控制台");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            plugin.getLogger().warning("[AI 错误] 调用被中断: " + e.getMessage());
             throw new IOException("AI 调用被中断: " + e.getMessage(), e);
         }
     }
@@ -627,8 +797,9 @@ public class CloudFlareAI {
         logInteraction(session, simpleBodyString, simpleRespBody);
 
         if (simpleResp.statusCode() != 200) {
-            plugin.getLogger().warning("[AI Error - Retry] Response Body: " + simpleRespBody);
-            throw new IOException("AI 调用失败(重试): " + simpleResp.statusCode() + " - " + simpleRespBody);
+            plugin.getLogger().warning("[AI Error - Retry] 状态码: " + simpleResp.statusCode());
+            plugin.getLogger().warning("[AI Error - Retry] 响应体: " + simpleRespBody);
+            throw new IOException("§zFancyHelper§b§r §7> §fAPI调用发生未知错误，请查看控制台");
         }
 
         JsonObject responseJson = gson.fromJson(simpleRespBody, JsonObject.class);
@@ -636,7 +807,8 @@ public class CloudFlareAI {
         if (retryResponse != null && retryResponse.getContent() != null) {
             return retryResponse;
         }
-        throw new IOException("无法解析 AI 响应结果(重试): " + simpleRespBody);
+        plugin.getLogger().warning("[AI 错误] 无法解析重试响应: " + simpleRespBody);
+        throw new IOException("§zFancyHelper§b§r §7> §fAPI调用发生未知错误，请查看控制台");
     }
 
     /**
