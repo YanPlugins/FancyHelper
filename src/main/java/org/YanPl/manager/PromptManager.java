@@ -137,17 +137,11 @@ public class PromptManager {
         sb.append("  #search: <args> - Search on the internet (prioritize Wiki, then general search if not found). Use precise keywords, avoid natural language for Wiki queries.\n");
         sb.append("    Add 'widely' keyword to force general web search. Example: #search: widely Minecraft latest version\n");
         sb.append("  #getpreset: <file> - Get preset file content. Prioritize reading relevant presets when handling tasks.\n");
-        sb.append("  #choose: <question>?|<header>=<label>(<desc>),... - Present a structured question with options for user to choose.\n");
-        sb.append("    Format breakdown:\n");
-        sb.append("      - Question: The question to ask (before '?')\n");
-        sb.append("      - |: Separator between question and options\n");
-        sb.append("      - Each option: header=label(description) separated by commas\n");
-        sb.append("        * header: Short chip label shown to user (max 12 chars)\n");
-        sb.append("        * label: Display text for the option\n");
-        sb.append("        * description: Explains what this option means or trade-offs\n");
-        sb.append("      - A 'Custom' option is ALWAYS automatically added at the end, do NOT write it yourself.\n");
-        sb.append("    Example: #choose: Which game mode?|Mode=Survival(Start from scratch with health/hunger),Mode=Creative(Unlimited blocks and flying),Mode=Adventure(Explore with restrictions)\n");
-        sb.append("    Legacy format also supported: #choose: option1,option2,option3\n");
+        sb.append("  #ask: <json> - Ask user to choose. Use when collecting preferences, clarifying requirements, or choosing between options.\n");
+        sb.append("    JSON params: question (string, required), header (max 12 chars), options[] (2-4, each has label & description).\n");
+        sb.append("    Optional: otherLabel (string) - if set, shows an extra option with this label for custom input.\n");
+        sb.append("    Note: Only ONE question per call. For multiple questions, wait for user's answer before asking the next.\n");
+        sb.append("    Example: #ask: {\"question\":\"Which database?\",\"header\":\"Database\",\"options\":[{\"label\":\"MySQL\",\"description\":\"Relational, mature\"},{\"label\":\"MongoDB\",\"description\":\"NoSQL, flexible\"}],\"otherLabel\":\"Other...\"}\n");
         sb.append("  #webread: <url> - Read web page content. Constructs real user-like requests to fetch and parse web pages.\n");
         sb.append("    Example: #webread: https://example.com\n\n");
         
