@@ -594,7 +594,7 @@ public class CloudFlareAI {
             case 400:
                 return "§zFancyHelper§b§r §7> §f构造的请求体有问题，请向开发者报告此错误";
             case 401:
-                return "§zFancyHelper§b§r §7> §fAPI-key填写不正确，请检查config.yml";
+                return "§zFancyHelper§b§r §7> §fAPI-key填写不正确，请检查config.yml [https://blog.baicaizhale.top/post/whyusee2]";
             case 402:
                 return "§zFancyHelper§b§r §7> §f开放平台显示您的余额不足，请检查您的开放平台余额";
             case 422:
@@ -620,7 +620,7 @@ public class CloudFlareAI {
             case 400:
                 return "构造的请求体有问题，请向开发者报告此错误";
             case 401:
-                return "API-key填写不正确，请检查config.yml";
+                return "API-key填写不正确，请检查config.yml [了解更多: https://blog.baicaizhale.top/post/whyusee2]";
             case 402:
                 return "开放平台显示您的余额不足，请检查您的开放平台余额";
             case 422:
