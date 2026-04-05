@@ -372,7 +372,7 @@ public class ToolExecutor {
             return;
         }
 
-        // #edit 需要确认（YOLO模式除外）
+        // #edit 需要确认（YOLO模式除外，SMART模式也不特殊处理，与NORMAL一致）
         if (session != null && session.getMode() == DialogueSession.Mode.YOLO) {
             String pendingStr = type.toUpperCase() + ":" + args;
             cliManager.setPendingCommand(uuid, pendingStr);
@@ -380,30 +380,8 @@ public class ToolExecutor {
             executeFileOperation(player, type, args);
             return;
         }
-        
-        if (session != null && session.getMode() == DialogueSession.Mode.SMART) {
-            player.sendMessage(ChatColor.GRAY + "⁕ 正在评估操作风险...");
-            cliManager.setGenerating(uuid, false, CLIManager.GenerationStatus.THINKING);
-            
-            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-                RiskAssessmentManager.RiskAssessment assessment = 
-                    riskAssessmentManager.assessRisk("edit", args);
-                
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    int threshold = plugin.getConfigManager().getSmartRiskThreshold();
-                    if (assessment.level >= threshold) {
-                        cliManager.sendSmartRiskConfirm(player, "edit", args, assessment);
-                    } else {
-                        String pendingStr = type.toUpperCase() + ":" + args;
-                        cliManager.setPendingCommand(uuid, pendingStr);
-                        cliManager.setGenerating(uuid, false, CLIManager.GenerationStatus.WAITING_CONFIRM);
-                        sendConfirmButtons(player, "");
-                    }
-                });
-            });
-            return;
-        }
 
+        // NORMAL 和 SMART 模式：都使用普通确认
         String pendingStr = type.toUpperCase() + ":" + args;
         cliManager.setPendingCommand(uuid, pendingStr);
         cliManager.setGenerating(uuid, false, CLIManager.GenerationStatus.WAITING_CONFIRM);
