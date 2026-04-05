@@ -129,6 +129,9 @@ public class CLICommand implements CommandExecutor, TabCompleter {
             case "help":
                 sendHelp(sender);
                 return true;
+            case "lib":
+                handleLibCommand(sender, args);
+                break;
             default:
                 sendHelp(sender);
                 break;
@@ -686,6 +689,117 @@ public class CLICommand implements CommandExecutor, TabCompleter {
         });
     }
 
+    /**
+     * 处理库管理命令，如安装ProtocolLib
+     * @param sender 命令发送者
+     * @param args 命令参数
+     */
+    private void handleLibCommand(CommandSender sender, String[] args) {
+        // 检查发送者是否有OP权限
+        if (!(sender instanceof Player) || !sender.isOp()) {
+            sender.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §c你需要OP权限来执行此命令。"));
+            return;
+        }
+
+        if (args.length < 2) {
+            sender.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f用法: /fancy lib install <library>"));
+            return;
+        }
+
+        String action = args[1].toLowerCase();
+        if (!action.equals("install")) {
+            sender.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f用法: /fancy lib install <library>"));
+            return;
+        }
+
+        if (args.length < 3) {
+            sender.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f请指定要安装的库。"));
+            return;
+        }
+
+        String library = args[2].toLowerCase();
+        if (!library.equals("protocolib")) {
+            sender.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f目前仅支持安装 ProtocolLib。"));
+            return;
+        }
+
+        // 检查是否已加载 ProtocolLib
+        if (Bukkit.getPluginManager().getPlugin("ProtocolLib") != null) {
+            sender.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §cProtocolLib 已加载，无需重新安装。"));
+            return;
+        }
+
+        // 检查插件目录是否已有 ProtocolLib 文件
+        File pluginsDir = plugin.getDataFolder().getParentFile();
+        boolean protocolLibExists = false;
+        if (pluginsDir.exists() && pluginsDir.isDirectory()) {
+            File[] files = pluginsDir.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file.getName().matches("(?i)ProtocolLib.*\\.jar")) {
+                        protocolLibExists = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (protocolLibExists) {
+            sender.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §c插件目录已存在 ProtocolLib 文件，请重启服务器以加载。"));
+            return;
+        }
+
+        // 开始下载并安装 ProtocolLib
+        sender.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f正在下载并安装 ProtocolLib..."));
+
+        // 异步执行下载操作
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                // 下载 URL
+                String downloadUrl = "https://fancy.baicaizhale.top/download/libs%2FProtocolLib.jar";
+                // 目标文件路径
+                File targetFile = new File(pluginsDir, "ProtocolLib.jar");
+
+                // 下载文件
+                java.net.URL url = new java.net.URL(downloadUrl);
+                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+                connection.setConnectTimeout(10000);
+                connection.setReadTimeout(30000);
+                connection.setRequestMethod("GET");
+
+                int responseCode = connection.getResponseCode();
+                if (responseCode == 200) {
+                    // 读取输入流并写入文件
+                    try (java.io.InputStream in = connection.getInputStream();
+                         java.io.FileOutputStream out = new java.io.FileOutputStream(targetFile)) {
+                        byte[] buffer = new byte[4096];
+                        int bytesRead;
+                        while ((bytesRead = in.read(buffer)) != -1) {
+                            out.write(buffer, 0, bytesRead);
+                        }
+                    }
+
+                    // 下载完成，提示用户
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        sender.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §aProtocolLib 下载完成！"));
+                        sender.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §f请重启服务器以加载 ProtocolLib。"));
+                    });
+                } else {
+                    // 下载失败
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        sender.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §c下载失败，HTTP 响应码: " + responseCode));
+                    });
+                }
+            } catch (Exception e) {
+                // 处理异常
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    sender.sendMessage(ColorUtil.translateCustomColors("§zFancyHelper§b§r §7> §c安装失败: " + e.getMessage()));
+                });
+                e.printStackTrace();
+            }
+        });
+    }
+
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
@@ -694,7 +808,7 @@ public class CLICommand implements CommandExecutor, TabCompleter {
                 "read", "set", "settings", "tools", "display", "toggle", 
                 "notice", "retry", "todo", "memory", "mem", "confirm", 
                 "cancel", "agree", "thought", "select", "exempt_anti_loop", 
-                "stop", "download", "help"
+                "stop", "download", "help", "lib"
             ));
             return subCommands.stream()
                     .filter(s -> s.startsWith(args[0].toLowerCase()))
@@ -714,6 +828,14 @@ public class CLICommand implements CommandExecutor, TabCompleter {
         } else if (args.length == 2 && (args[0].equalsIgnoreCase("memory") || args[0].equalsIgnoreCase("mem"))) {
             return Arrays.asList("add", "del", "edit", "clear").stream()
                     .filter(s -> s.startsWith(args[1].toLowerCase()))
+                    .collect(Collectors.toList());
+        } else if (args.length == 2 && args[0].equalsIgnoreCase("lib")) {
+            return Arrays.asList("install").stream()
+                    .filter(s -> s.startsWith(args[1].toLowerCase()))
+                    .collect(Collectors.toList());
+        } else if (args.length == 3 && args[0].equalsIgnoreCase("lib") && args[1].equalsIgnoreCase("install")) {
+            return Arrays.asList("protocolib").stream()
+                    .filter(s -> s.startsWith(args[2].toLowerCase()))
                     .collect(Collectors.toList());
         }
         return new ArrayList<>();
