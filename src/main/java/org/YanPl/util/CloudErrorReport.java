@@ -99,11 +99,9 @@ public class CloudErrorReport {
         collectConsoleMessages(consoleLog);
         logFiles.add(consoleLog);
 
-        // 2. 收集最近活跃的会话日志
-        File sessionLog = collectSessionLog(tempDir);
-        if (sessionLog != null) {
-            logFiles.add(sessionLog);
-        }
+        // 2. 收集CLI会话日志（根据在线CLI人数智能收集）
+        List<File> cliSessionLogs = collectCLISessionLogs(tempDir);
+        logFiles.addAll(cliSessionLogs);
 
         // 3. 收集错误信息
         File messagesLog = new File(tempDir, "messages.log");
@@ -212,6 +210,68 @@ public class CloudErrorReport {
             }
         }
         return null;
+    }
+
+    /**
+     * 收集CLI会话日志（智能收集）
+     * 根据当前处于CLI模式的人数，收集对应数量的最新日志文件
+     *
+     * @param tempDir 临时目录
+     * @return 收集的日志文件列表
+     * @throws IOException IO异常
+     */
+    private List<File> collectCLISessionLogs(File tempDir) throws IOException {
+        List<File> collectedLogs = new ArrayList<>();
+
+        if (!(plugin instanceof FancyHelper)) {
+            return collectedLogs;
+        }
+
+        FancyHelper fancyHelper = (FancyHelper) plugin;
+        org.YanPl.manager.CLIManager cliManager = fancyHelper.getCliManager();
+
+        // 获取当前处于CLI模式的人数
+        int cliPlayerCount = cliManager.getActivePlayersCount();
+        if (cliPlayerCount <= 0) {
+            return collectedLogs;
+        }
+
+        // 获取logs目录
+        File logsDir = new File(plugin.getDataFolder(), "logs");
+        if (!logsDir.exists() || !logsDir.isDirectory()) {
+            return collectedLogs;
+        }
+
+        // 获取所有日志文件并按修改时间排序
+        File[] logFiles = logsDir.listFiles((dir, name) -> name.endsWith(".log"));
+        if (logFiles == null || logFiles.length == 0) {
+            return collectedLogs;
+        }
+
+        // 按最后修改时间降序排序
+        java.util.Arrays.sort(logFiles, (f1, f2) -> Long.compare(f2.lastModified(), f1.lastModified()));
+
+        // 根据CLI人数收集对应数量的最新日志文件
+        int countToCollect = Math.min(cliPlayerCount, logFiles.length);
+        for (int i = 0; i < countToCollect; i++) {
+            File logFile = logFiles[i];
+            // 创建临时文件，使用原始文件名
+            File tempLogFile = new File(tempDir, logFile.getName());
+
+            // 复制日志内容
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(logFile, java.nio.charset.StandardCharsets.UTF_8));
+                 java.io.BufferedWriter writer = new java.io.BufferedWriter(new java.io.FileWriter(tempLogFile, java.nio.charset.StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    writer.write(line);
+                    writer.newLine();
+                }
+            }
+
+            collectedLogs.add(tempLogFile);
+        }
+
+        return collectedLogs;
     }
 
     /**
