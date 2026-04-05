@@ -110,6 +110,12 @@ public class CloudErrorReport {
         collectErrorMessages(messagesLog, throwable);
         logFiles.add(messagesLog);
 
+        // 4. 收集配置文件
+        File configFile = collectConfigFile(tempDir);
+        if (configFile != null) {
+            logFiles.add(configFile);
+        }
+
         return logFiles;
     }
 
@@ -204,6 +210,35 @@ public class CloudErrorReport {
                     }
                 }
             }
+        }
+        return null;
+    }
+
+    /**
+     * 收集配置文件
+     *
+     * @param tempDir 临时目录
+     * @return 配置文件
+     * @throws IOException IO异常
+     */
+    private File collectConfigFile(File tempDir) throws IOException {
+        // 获取插件的配置文件
+        File configFile = new File(plugin.getDataFolder(), "config.yml");
+        if (configFile.exists() && configFile.isFile()) {
+            // 创建临时配置文件
+            File tempConfig = new File(tempDir, "config.yml");
+            
+            // 复制配置文件内容
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(configFile, java.nio.charset.StandardCharsets.UTF_8));
+                 java.io.BufferedWriter writer = new java.io.BufferedWriter(new java.io.FileWriter(tempConfig, java.nio.charset.StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    writer.write(line);
+                    writer.newLine();
+                }
+            }
+            
+            return tempConfig;
         }
         return null;
     }
